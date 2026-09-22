@@ -1,0 +1,7 @@
+node_modules/
+.env
+uploads/
+*.log
+admin-server/config.json
+admin-server/admins.json
+admin-server/data/

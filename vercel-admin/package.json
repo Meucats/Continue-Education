@@ -1,0 +1,9 @@
+{
+  "name": "admin-server",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "xlsx": "^0.18.5",
+    "busboy": "^1.6.0"
+  }
+}
