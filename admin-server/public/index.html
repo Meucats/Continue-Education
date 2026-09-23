@@ -674,6 +674,8 @@
                                     <th width="40"><input type="checkbox" id="checkAll" onchange="toggleCheckAll()"></th>
                                     <th>姓名</th>
                                     <th>联系电话</th>
+                                    <th>身份证</th>
+                                    <th>公司</th>
                                     <th>班级名称</th>
                                     <th>上课时间</th>
                                     <th>上课地点</th>
@@ -696,6 +698,8 @@
                     <div>
                         <strong>导入说明：</strong>支持自定义 Excel 模板，系统会自动识别常见表头名称。<br>
                         必须包含字段：<strong>姓名、联系电话、班级名称、上课时间段、课程开始日期、课程结束日期、上课地点</strong><br>
+                        可选字段：<strong>身份证号码、公司名称</strong>（表头需包含"身份证"或"公司"关键词）<br>
+                        上课时间段支持逗号分隔多时间段，如：<strong>周三下午 14:00-16:00, 周五上午 9:00-11:00</strong><br>
                         系统会根据上课时间段中的星期几和课程开始/结束日期自动生成每节课的具体日期。如手机号已存在，系统会自动更新该学员信息。
                     </div>
                 </div>
@@ -1114,7 +1118,7 @@ function loadStudents() {
 function renderStudents(students) {
     const tbody = document.getElementById('studentTableBody');
     if (students.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">暂无学员数据</div><div class="empty-hint">点击右上角「添加学员」或「批量导入」</div></div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">暂无学员数据</div><div class="empty-hint">点击右上角「添加学员」或「批量导入」</div></div></td></tr>';
         return;
     }
     tbody.innerHTML = students.map(s => {
@@ -1123,6 +1127,8 @@ function renderStudents(students) {
             <td><input type="checkbox" class="stu-check" value="${s._id}"></td>
             <td><strong>${s.name}</strong></td>
             <td>${s.phone}</td>
+            <td>${s.idCard || '-'}</td>
+            <td>${s.company || '-'}</td>
             <td>${s.className}</td>
             <td>${s.schedule}</td>
             <td>${s.location}</td>
@@ -1140,7 +1146,7 @@ function renderStudents(students) {
 function searchStudents() {
     const key = document.getElementById('studentSearch').value.trim().toLowerCase();
     if (!key) { renderStudents(allStudents); return; }
-    renderStudents(allStudents.filter(s => s.name.toLowerCase().includes(key) || s.phone.includes(key) || (s.className && s.className.toLowerCase().includes(key))));
+    renderStudents(allStudents.filter(s => s.name.toLowerCase().includes(key) || s.phone.includes(key) || (s.className && s.className.toLowerCase().includes(key)) || (s.idCard && s.idCard.includes(key)) || (s.company && s.company.toLowerCase().includes(key))));
 }
 
 function toggleCheckAll() {
