@@ -225,6 +225,8 @@
         .tag-approved .tag-dot { background: #22c55e; }
         .tag-rejected { background: #fef2f2; color: #991b1b; }
         .tag-rejected .tag-dot { background: #ef4444; }
+        .tag-expired { background: #f0f0f0; color: #666; }
+        .tag-expired .tag-dot { background: #999; }
 
         /* ========== 搜索和工具栏 ========== */
         .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
@@ -761,6 +763,8 @@
                                     <th>姓名</th>
                                     <th>联系电话</th>
                                     <th>车牌号</th>
+                                    <th>进校日期</th>
+                                    <th>有效时段</th>
                                     <th>申请时间</th>
                                     <th>状态</th>
                                     <th width="160">操作</th>
@@ -1350,17 +1354,25 @@ function loadRequests() {
 function renderRequests(requests) {
     const tbody = document.getElementById('requestTableBody');
     if (requests.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">暂无申请数据</div></div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">暂无申请数据</div></div></td></tr>';
         return;
     }
+    const now = new Date();
     const statusMap = { pending: ['待审核', 'tag-pending'], approved: ['已通过', 'tag-approved'], rejected: ['已拒绝', 'tag-rejected'] };
     tbody.innerHTML = requests.map(r => {
-        const [statusText, statusClass] = statusMap[r.status] || ['未知', ''];
+        const isExpired = r.status === 'approved' && r.entryEndTime && now > new Date(r.entryEndTime);
+        let statusText, statusClass;
+        if (isExpired) { statusText = '已过期'; statusClass = 'tag-expired'; }
+        else { [statusText, statusClass] = statusMap[r.status] || ['未知', '']; }
         const time = r.createdAt ? new Date(r.createdAt).toLocaleString('zh-CN') : '-';
+        const entryDate = r.entryDate || '-';
+        const timeSlot = r.entryStartTime ? `${r.entryStartTime} - ${r.entryEndTime}` : '-';
         return `<tr>
             <td><strong>${r.name}</strong></td>
             <td>${r.phone}</td>
             <td>${r.carPlate || '-'}</td>
+            <td>${entryDate}</td>
+            <td>${timeSlot}</td>
             <td>${time}</td>
             <td><span class="tag ${statusClass}"><span class="tag-dot"></span>${statusText}</span></td>
             <td>
