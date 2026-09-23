@@ -28,7 +28,7 @@ export default {
         if (!phone || !password) return json({ success: false, message: '请输入账号和密码' });
         const admins = await getAdmins(env);
         const admin = admins.find(a => a.phone === phone && a.password === password);
-        if (admin) return json({ success: true, data: { name: admin.name, phone: admin.phone, role: admin.role } });
+        if (admin) return json({ success: true, data: { name: admin.name, phone: admin.phone, role: admin.role, classes: admin.classes || [] } });
         return json({ success: false, message: '账号或密码错误' });
       }
 
@@ -41,11 +41,11 @@ export default {
       // 添加管理员
       if (path === '/api/admins' && request.method === 'POST') {
         const body = await request.json();
-        const { name, phone, password, role } = body;
+        const { name, phone, password, role, classes } = body;
         if (!name || !phone || !password) return json({ success: false, message: '请填写所有字段' });
         const admins = await getAdmins(env);
         if (admins.find(a => a.phone === phone)) return json({ success: false, message: '该账号已存在' });
-        admins.push({ id: 'admin-' + Date.now(), name, phone, password, role: role || 'admin', createdAt: new Date().toISOString() });
+        admins.push({ id: 'admin-' + Date.now(), name, phone, password, role: role || 'admin', classes: classes || [], createdAt: new Date().toISOString() });
         await env.ADMIN_KV.put('admins', JSON.stringify(admins));
         return json({ success: true, message: '添加成功' });
       }
@@ -177,6 +177,52 @@ export default {
             ...corsHeaders()
           }
         });
+      }
+
+      // ====== 温馨提示 ======
+      if (path === '/api/tips' && request.method === 'GET') {
+        const result = await callCloud(env, 'getAllTips');
+        return json(result);
+      }
+      if (path === '/api/tips' && request.method === 'POST') {
+        const body = await request.json();
+        const result = await callCloud(env, 'updateTip', { data: body });
+        return json(result);
+      }
+      if (path.match(/^\/api\/tips\/[^/]+$/) && request.method === 'DELETE') {
+        const id = path.split('/').pop();
+        const result = await callCloud(env, 'deleteTip', { data: { id } });
+        return json(result);
+      }
+
+      // ====== 班级列表 ======
+      if (path === '/api/classes' && request.method === 'GET') {
+        const result = await callCloud(env, 'getClasses');
+        return json(result);
+      }
+
+      // ====== 管理员批量导入 ======
+      if (path === '/api/admins/import' && request.method === 'POST') {
+        const body = await request.json();
+        const { admins: adminList } = body;
+        if (!adminList || adminList.length === 0) return json({ success: false, message: '没有数据' });
+        let added = 0, failed = 0;
+        const errors = [];
+        const admins = await getAdmins(env);
+        for (let i = 0; i < adminList.length; i++) {
+          const a = adminList[i];
+          try {
+            if (!a.name || !a.phone || !a.password) { errors.push(`第${i + 2}行：缺少必填字段`); failed++; continue; }
+            if (admins.find(x => x.phone === a.phone)) { errors.push(`第${i + 2}行：账号已存在`); failed++; continue; }
+            admins.push({ id: 'admin-' + Date.now() + '-' + i, name: a.name, phone: a.phone, password: a.password, role: a.role || 'admin', classes: a.classes || [], createdAt: new Date().toISOString() });
+            added++;
+          } catch (err) {
+            errors.push(`第${i + 2}行：${err.message}`);
+            failed++;
+          }
+        }
+        await env.ADMIN_KV.put('admins', JSON.stringify(admins));
+        return json({ success: true, data: { total: adminList.length, added, failed, errors } });
       }
 
       return new Response('Not Found', { status: 404 });
@@ -349,6 +395,7 @@ th{background:#fafafa;font-weight:600;color:var(--text2)}
 <div class="nav-item" onclick="switchPage('import',this)">📥 批量导入</div>
 <div class="nav-item" onclick="switchPage('requests',this)">🏫 进校申请</div>
 <div class="nav-item" onclick="switchPage('admin-manage',this)">⚙️ 管理员</div>
+<div class="nav-item" onclick="switchPage('tips',this)">💡 温馨提示</div>
 <div class="nav-item" onclick="doLogout()" style="color:var(--danger)">🚪 退出登录</div>
 </div>
 <div class="main">
@@ -410,11 +457,23 @@ th{background:#fafafa;font-weight:600;color:var(--text2)}
 </div>
 <!-- 管理员 -->
 <div id="page-admin-manage" class="page-content hidden">
-<div class="topbar"><div class="page-title">管理员管理</div><button class="btn btn-primary btn-sm" onclick="showAddAdminModal()">+ 添加管理员</button></div>
+<div class="topbar"><div class="page-title">管理员管理</div><div style="display:flex;gap:8px;"><button class="btn btn-secondary btn-sm" onclick="showAdminImportModal()">📥 导入</button><button class="btn btn-primary btn-sm" onclick="showAddAdminModal()">+ 添加</button></div></div>
 <div class="card"><div class="table-container"><table>
-<thead><tr><th>名称</th><th>账号</th><th>角色</th><th>创建时间</th><th>操作</th></tr></thead>
+<thead><tr><th>名称</th><th>账号</th><th>角色</th><th>负责班级</th><th>创建时间</th><th>操作</th></tr></thead>
 <tbody id="adminTableBody"></tbody>
 </table></div></div>
+</div>
+<!-- 温馨提示 -->
+<div id="page-tips" class="page-content hidden">
+<div class="topbar"><div class="page-title">温馨提示</div></div>
+<div class="info-banner">💡 为每个班级设置温馨提示，学员登录小程序后将在首页看到对应提示。</div>
+<div class="card">
+<div style="margin-bottom:12px;"><button class="btn btn-primary btn-sm" onclick="showAddTipModal()">+ 添加温馨提示</button></div>
+<div class="table-container"><table>
+<thead><tr><th>班级名称</th><th>温馨提示内容</th><th>更新时间</th><th>操作</th></tr></thead>
+<tbody id="tipTableBody"></tbody>
+</table></div>
+</div>
 </div>
 </div>
 </div>
@@ -427,9 +486,35 @@ th{background:#fafafa;font-weight:600;color:var(--text2)}
 <div class="form-group"><label>账号(手机)</label><input id="adminPhone"></div>
 <div class="form-group"><label>密码</label><input id="adminPwd" type="password"></div>
 <div class="form-group"><label>角色</label><select id="adminRole"><option value="admin">管理员</option><option value="superadmin">超级管理员</option></select></div>
+<div class="form-group"><label>负责班级</label><div id="adminClassesBox" style="max-height:100px;overflow-y:auto;border:1px solid #e8e8e8;border-radius:8px;padding:8px;font-size:13px;">加载中...</div></div>
 <div class="modal-btns">
 <button class="btn btn-ghost" onclick="hideModal('adminModal')">取消</button>
 <button class="btn btn-primary" onclick="addAdmin()">确认</button>
+</div>
+</div>
+</div>
+<!-- 温馨提示弹窗 -->
+<div id="tipModal" class="modal-mask hidden">
+<div class="modal-box">
+<h3>编辑温馨提示</h3>
+<div class="form-group"><label>班级名称</label><select id="tipClassName"><option value="">请选择班级</option></select></div>
+<div class="form-group"><label>温馨提示内容</label><textarea id="tipContent" rows="4" style="width:100%;border:1px solid #e8e8e8;border-radius:8px;padding:8px;font-size:13px;" placeholder="请输入温馨提示内容..."></textarea></div>
+<div class="modal-btns">
+<button class="btn btn-ghost" onclick="hideModal('tipModal')">取消</button>
+<button class="btn btn-primary" onclick="saveTip()">保存</button>
+</div>
+</div>
+</div>
+<!-- 管理员导入弹窗 -->
+<div id="adminImportModal" class="modal-mask hidden">
+<div class="modal-box">
+<h3>批量导入管理员</h3>
+<div class="info-banner" style="font-size:12px;">Excel表头：姓名、账号、密码、角色、班级（逗号分隔）</div>
+<div class="upload-zone" onclick="document.getElementById('adminFileInput').click()" style="border:2px dashed #e8e8e8;border-radius:12px;padding:20px;text-align:center;cursor:pointer;margin:12px 0;">📄 点击选择 Excel 文件</div>
+<input type="file" id="adminFileInput" accept=".xlsx,.xls" style="display:none" onchange="handleAdminFile(event)">
+<div id="adminImportResult"></div>
+<div class="modal-btns">
+<button class="btn btn-ghost" onclick="hideModal('adminImportModal')">关闭</button>
 </div>
 </div>
 </div>
@@ -469,6 +554,7 @@ if(page==='dashboard')loadDashboard();
 if(page==='students')loadStudents();
 if(page==='requests')loadRequests();
 if(page==='admin-manage')loadAdmins();
+if(page==='tips')loadTips();
 }
 
 // 首页统计
@@ -567,23 +653,108 @@ async function approveReq(id){if(!confirm('通过此申请？'))return;const r=a
 async function rejectReq(id){const reason=prompt('拒绝原因（选填）');const r=await api('/api/requests/'+id+'/reject',{reason});if(r.success){toast('已拒绝');loadRequests();}else toast(r.message);}
 
 // 管理员管理
+let allClasses=[];
 async function loadAdmins(){
 const r=await api('/api/admins');
+const cr=await api('/api/classes');
+if(cr.success)allClasses=cr.data||[];
 if(r.success){
 const tbody=document.getElementById('adminTableBody');
-tbody.innerHTML=(r.data||[]).map(a=>'<tr><td>'+a.name+'</td><td>'+a.phone+'</td><td>'+(a.role==='superadmin'?'超级管理员':'管理员')+'</td><td>'+(a.createdAt||'-')+'</td><td>'+(a.phone==='admin'?'<span style="color:#999">默认</span>':'<button class="btn btn-ghost btn-sm" onclick="delAdmin(\\''+a.id+'\\',\\''+a.name+'\\')">删除</button>')+'</td></tr>').join('');
+tbody.innerHTML=(r.data||[]).map(a=>{
+const cls=(a.classes&&a.classes.length>0)?a.classes.join('、'):'<span style="color:#999">未分配</span>';
+return '<tr><td><b>'+a.name+'</b></td><td>'+a.phone+'</td><td>'+(a.role==='superadmin'?'超级管理员':'管理员')+'</td><td style="font-size:12px;">'+cls+'</td><td>'+(a.createdAt||'-')+'</td><td>'+(a.phone==='admin'?'<span style="color:#999">默认</span>':'<button class="btn btn-ghost btn-sm" onclick="delAdmin(\\''+a.id+'\\',\\''+a.name+'\\')">删除</button>')+'</td></tr>';
+}).join('');
 }
 }
+function showAddAdminModal(){
+document.getElementById('adminName').value='';
+document.getElementById('adminPhone').value='';
+document.getElementById('adminPwd').value='';
+document.getElementById('adminRole').value='admin';
+loadClassesCheckboxes([]);
+document.getElementById('adminModal').classList.remove('hidden');
+}
+function loadClassesCheckboxes(selected){
+const box=document.getElementById('adminClassesBox');
+if(!allClasses.length){box.innerHTML='<span style="color:#999">暂无班级</span>';return;}
+box.innerHTML=allClasses.map(c=>'<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px;cursor:pointer;"><input type="checkbox" class="admin-class-cb" value="'+c+'" '+(selected.includes(c)?'checked':'')+'>'+c+'</label>').join('');
+}
+function getCheckedClasses(){return[...document.querySelectorAll('.admin-class-cb:checked')].map(cb=>cb.value);}
 async function addAdmin(){
 const name=document.getElementById('adminName').value.trim();
 const phone=document.getElementById('adminPhone').value.trim();
 const pwd=document.getElementById('adminPwd').value.trim();
 const role=document.getElementById('adminRole').value;
+const classes=getCheckedClasses();
 if(!name||!phone||!pwd)return toast('请填写所有字段');
-const r=await api('/api/admins',{name,phone,password:pwd,role});
+const r=await api('/api/admins',{name,phone,password:pwd,role,classes});
 if(r.success){toast('添加成功');hideModal('adminModal');loadAdmins();}else toast(r.message);
 }
 async function delAdmin(id,name){if(!confirm('删除管理员「'+name+'」？'))return;const r=await fetch(API+'/api/admins/'+id,{method:'DELETE'});const d=await r.json();if(d.success){toast('已删除');loadAdmins();}else toast(d.message);}
+
+// 温馨提示管理
+async function loadTips(){
+const r=await api('/api/tips');
+const tbody=document.getElementById('tipTableBody');
+if(!r.success||!r.data||!r.data.length){tbody.innerHTML='<tr><td colspan="4"><div style="text-align:center;padding:30px;color:#999">暂无温馨提示</div></td></tr>';return;}
+tbody.innerHTML=r.data.map(t=>{
+const time=t.updatedAt?new Date(t.updatedAt).toLocaleString('zh-CN'):'-';
+return '<tr><td><b>'+t.className+'</b></td><td style="max-width:300px;white-space:pre-wrap;">'+(t.content||'<span style="color:#999">空</span>')+'</td><td>'+time+'</td><td><button class="btn btn-ghost btn-sm" onclick="editTip(\\''+t._id+'\\',\\''+t.className+'\\',\\''+String(t.content||'').replace(/'/g,"\\'")+'\\')">✏️</button> <button class="btn btn-ghost btn-sm" onclick="delTip(\\''+t._id+'\\',\\''+t.className+'\\')">🗑️</button></td></tr>';
+}).join('');
+}
+function showAddTipModal(){
+document.getElementById('editTipId')&&(document.getElementById('editTipId').value='');
+document.getElementById('tipClassName').value='';
+document.getElementById('tipContent').value='';
+loadTipClassOptions();
+document.getElementById('tipModal').classList.remove('hidden');
+}
+function editTip(id,className,content){
+document.getElementById('tipModal').classList.remove('hidden');
+document.getElementById('tipClassName').value=className;
+document.getElementById('tipContent').value=content;
+}
+function loadTipClassOptions(){
+const sel=document.getElementById('tipClassName');
+sel.innerHTML='<option value="">请选择班级</option>';
+allClasses.forEach(c=>{sel.innerHTML+='<option value="'+c+'">'+c+'</option>';});
+}
+async function saveTip(){
+const className=document.getElementById('tipClassName').value;
+const content=document.getElementById('tipContent').value.trim();
+if(!className)return toast('请选择班级');
+const r=await api('/api/tips',{className,content});
+if(r.success){toast('保存成功');hideModal('tipModal');loadTips();}else toast(r.message);
+}
+async function delTip(id,className){if(!confirm('删除「'+className+'」的温馨提示？'))return;const r=await fetch(API+'/api/tips/'+id,{method:'DELETE'});const d=await r.json();if(d.success){toast('已删除');loadTips();}else toast(d.message);}
+
+// 管理员导入
+function showAdminImportModal(){document.getElementById('adminImportResult').innerHTML='';document.getElementById('adminFileInput').value='';document.getElementById('adminImportModal').classList.remove('hidden');}
+async function handleAdminFile(e){
+const file=e.target.files[0];if(!file)return;
+document.getElementById('adminImportResult').innerHTML='<div style="color:#1a73e8">正在解析...</div>';
+try{
+const data=await file.arrayBuffer();
+const workbook=XLSX.read(data,{type:'array'});
+const ws=workbook.Sheets[workbook.SheetNames[0]];
+const jsonData=XLSX.utils.sheet_to_json(ws);
+const headers=XLSX.utils.sheet_to_json(ws,{header:1})[0]||[];
+const fm={};
+const aliases={name:['姓名','名称'],phone:['账号','手机','电话'],password:['密码'],role:['角色'],classes:['班级','负责班级']};
+headers.forEach((h,i)=>{const header=String(h).trim();for(const[f,ns]of Object.entries(aliases))if(ns.some(n=>header.includes(n))){fm[f]=i;break;}});
+const admins=jsonData.map(row=>{const keys=Object.keys(row);return{
+name:fm.name!==undefined?String(row[keys[fm.name]]||'').trim():'',
+phone:fm.phone!==undefined?String(row[keys[fm.phone]]||'').trim():'',
+password:fm.password!==undefined?String(row[keys[fm.password]]||'').trim():'',
+role:fm.role!==undefined?String(row[keys[fm.role]]||'').trim():'admin',
+classes:fm.classes!==undefined?String(row[keys[fm.classes]]||'').split(/[,，]/).map(s=>s.trim()).filter(Boolean):[]
+};});
+const r=await fetch(API+'/api/admins/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({admins})});
+const res=await r.json();
+if(res.success){const d=res.data;document.getElementById('adminImportResult').innerHTML='<div style="color:#28a745">导入完成：共'+d.total+'条，成功'+d.added+'条，失败'+d.failed+'条</div>'+(d.errors&&d.errors.length?'<div style="color:#dc3545;font-size:12px;margin-top:8px;">'+d.errors.join('<br>')+'</div>':'');loadAdmins();}
+else toast(res.message);
+}catch(err){document.getElementById('adminImportResult').innerHTML='<div style="color:#dc3545">导入失败：'+err.message+'</div>';}
+}
 
 // 初始化
 if(localStorage.getItem('admin')){document.getElementById('loginPage').classList.add('hidden');document.getElementById('appPage').classList.remove('hidden');loadDashboard();}

@@ -105,7 +105,7 @@ app.post('/api/admin/login', async (req, res) => {
   if (!phone || !password) return res.json({ success: false, message: '请输入账号和密码' });
   const admins = loadAdmins();
   const admin = admins.find(a => a.phone === phone && a.password === password);
-  if (admin) return res.json({ success: true, data: { name: admin.name, phone: admin.phone, role: admin.role } });
+  if (admin) return res.json({ success: true, data: { name: admin.name, phone: admin.phone, role: admin.role, classes: admin.classes || [] } });
   res.json({ success: false, message: '账号或密码错误' });
 });
 
@@ -116,11 +116,11 @@ app.get('/api/admins', (req, res) => {
 });
 
 app.post('/api/admins', (req, res) => {
-  const { name, phone, password, role } = req.body;
+  const { name, phone, password, role, classes } = req.body;
   if (!name || !phone || !password) return res.json({ success: false, message: '请填写所有字段' });
   const admins = loadAdmins();
   if (admins.find(a => a.phone === phone)) return res.json({ success: false, message: '该账号已存在' });
-  admins.push({ id: 'admin-' + Date.now(), name, phone, password, role: role || 'admin', createdAt: new Date().toISOString() });
+  admins.push({ id: 'admin-' + Date.now(), name, phone, password, role: role || 'admin', classes: classes || [], createdAt: new Date().toISOString() });
   saveAdmins(admins);
   res.json({ success: true, message: '添加成功' });
 });
@@ -129,11 +129,12 @@ app.put('/api/admins/:id', (req, res) => {
   const admins = loadAdmins();
   const idx = admins.findIndex(a => a.id === req.params.id);
   if (idx < 0) return res.json({ success: false, message: '管理员不存在' });
-  const { name, phone, password, role } = req.body;
+  const { name, phone, password, role, classes } = req.body;
   admins[idx].name = name || admins[idx].name;
   admins[idx].phone = phone || admins[idx].phone;
   if (password) admins[idx].password = password;
   if (role) admins[idx].role = role;
+  if (classes !== undefined) admins[idx].classes = classes;
   saveAdmins(admins);
   res.json({ success: true, message: '更新成功' });
 });
@@ -480,6 +481,78 @@ app.get('/api/template/download', (req, res) => {
   res.setHeader('Content-Disposition', "attachment; filename*=UTF-8''%E5%AD%A6%E5%91%98%E4%BF%A1%E6%81%AF%E5%AF%BC%E5%85%A5%E6%A8%A1%E6%9D%BF.xlsx");
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.send(buf);
+});
+
+// ====== 温馨提示 ======
+app.get('/api/tips', async (req, res) => {
+  try {
+    const result = await callCloudFunction('getAllTips');
+    res.json(result);
+  } catch (err) {
+    res.json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/tips', async (req, res) => {
+  try {
+    const result = await callCloudFunction('updateTip', { data: req.body });
+    res.json(result);
+  } catch (err) {
+    res.json({ success: false, message: err.message });
+  }
+});
+
+app.delete('/api/tips/:id', async (req, res) => {
+  try {
+    const result = await callCloudFunction('deleteTip', { data: { id: req.params.id } });
+    res.json(result);
+  } catch (err) {
+    res.json({ success: false, message: err.message });
+  }
+});
+
+// ====== 班级列表 ======
+app.get('/api/classes', async (req, res) => {
+  try {
+    const result = await callCloudFunction('getClasses');
+    res.json(result);
+  } catch (err) {
+    res.json({ success: false, message: err.message });
+  }
+});
+
+// ====== 管理员批量导入 ======
+app.post('/api/admins/import', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.json({ success: false, message: '请上传文件' });
+    const workbook = XLSX.readFile(req.file.path);
+    const ws = workbook.Sheets[workbook.SheetNames[0]];
+    const jsonData = XLSX.utils.sheet_to_json(ws);
+    const headers = XLSX.utils.sheet_to_json(ws, { header: 1 })[0] || [];
+    const fieldMap = {};
+    const aliases = { name: ['姓名', '名称'], phone: ['账号', '手机', '电话'], password: ['密码'], role: ['角色'], classes: ['班级', '负责班级'] };
+    headers.forEach((h, i) => {
+      const header = String(h).trim();
+      for (const [field, names] of Object.entries(aliases)) {
+        if (names.some(n => header.includes(n))) { fieldMap[field] = i; break; }
+      }
+    });
+    const admins = jsonData.map(row => {
+      const keys = Object.keys(row);
+      return {
+        name: fieldMap.name !== undefined ? String(row[keys[fieldMap.name]] || '').trim() : '',
+        phone: fieldMap.phone !== undefined ? String(row[keys[fieldMap.phone]] || '').trim() : '',
+        password: fieldMap.password !== undefined ? String(row[keys[fieldMap.password]] || '').trim() : '',
+        role: fieldMap.role !== undefined ? String(row[keys[fieldMap.role]] || '').trim() : 'admin',
+        classes: fieldMap.classes !== undefined ? String(row[keys[fieldMap.classes]] || '').split(/[,，]/).map(s => s.trim()).filter(Boolean) : []
+      };
+    });
+    const result = await callCloudFunction('importAdmins', { data: { admins } });
+    fs.unlinkSync(req.file.path);
+    res.json(result);
+  } catch (err) {
+    res.json({ success: false, message: err.message });
+  }
 });
 
 // ====== 启动 ======

@@ -512,6 +512,9 @@
                 <div class="nav-item" onclick="switchPage('admin-manage', this)">
                     <span class="nav-icon">👤</span> 管理员管理
                 </div>
+                <div class="nav-item" onclick="switchPage('tips', this)">
+                    <span class="nav-icon">💡</span> 温馨提示
+                </div>
                 <div class="nav-item" onclick="switchPage('accounts', this)">
                     <span class="nav-icon">🔑</span> 账户管理
                 </div>
@@ -790,7 +793,10 @@
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">管理员列表</div>
-                        <button class="btn btn-primary btn-sm" onclick="showAddAdminModal()">添加管理员</button>
+                        <div style="display:flex;gap:8px;">
+                            <button class="btn btn-secondary btn-sm" onclick="showAdminImportModal()">📥 批量导入</button>
+                            <button class="btn btn-primary btn-sm" onclick="showAddAdminModal()">添加管理员</button>
+                        </div>
                     </div>
                     <div class="table-container">
                         <table>
@@ -799,11 +805,38 @@
                                     <th>姓名</th>
                                     <th>账号</th>
                                     <th>角色</th>
+                                    <th>负责班级</th>
                                     <th>创建时间</th>
                                     <th width="160">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="adminTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== 学员账户 ========== -->
+            <div id="page-tips" class="page-content hidden">
+                <div class="info-banner">
+                    <span class="banner-icon">💡</span>
+                    <div>为每个班级设置温馨提示，学员登录小程序后将在首页看到对应提示。</div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">温馨提示列表</div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>班级名称</th>
+                                    <th>温馨提示内容</th>
+                                    <th>更新时间</th>
+                                    <th width="160">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tipTableBody"></tbody>
                         </table>
                     </div>
                 </div>
@@ -949,10 +982,73 @@
                     <option value="superadmin">超级管理员</option>
                 </select>
             </div>
+            <div class="form-group">
+                <label class="form-label">负责班级</label>
+                <div id="adminClassesContainer" style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:8px;">
+                    <div style="color:#999;font-size:13px;">加载中...</div>
+                </div>
+                <small style="color:var(--gray-400);font-size:12px;">勾选该管理员负责的班级</small>
+            </div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeAdminModal()">取消</button>
             <button class="btn btn-primary" onclick="saveAdmin()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== 温馨提示模态框 ==================== -->
+<div id="tipModal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" id="tipModalTitle">编辑温馨提示</div>
+            <button class="modal-close" onclick="closeTipModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="editTipId">
+            <div class="form-group">
+                <label class="form-label">班级名称 <span class="required">*</span></label>
+                <select id="tipClassName" class="form-select">
+                    <option value="">请选择班级</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">温馨提示内容</label>
+                <textarea id="tipContent" class="form-textarea" rows="4" placeholder="请输入温馨提示内容..."></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeTipModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveTip()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== 管理员导入模态框 ==================== -->
+<div id="adminImportModal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">批量导入管理员</div>
+            <button class="modal-close" onclick="closeAdminImportModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="info-banner" style="margin-bottom:16px;">
+                <span class="banner-icon">💡</span>
+                <div>
+                    Excel 表头：<strong>姓名、账号、密码、角色、班级</strong><br>
+                    角色可选：admin（管理员）或 superadmin（超级管理员）<br>
+                    班级用逗号分隔，如：计算机基础班,会计实务班
+                </div>
+            </div>
+            <div class="upload-zone" id="adminUploadZone" style="padding:20px;">
+                <div class="upload-icon">📄</div>
+                <div class="upload-text">点击选择 Excel 文件</div>
+            </div>
+            <input type="file" id="adminFileInput" accept=".xlsx,.xls" style="display:none" onchange="handleAdminFileSelect(event)">
+            <div id="adminImportResult" style="margin-top:12px;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeAdminImportModal()">关闭</button>
         </div>
     </div>
 </div>
@@ -968,6 +1064,7 @@ const pageConfig = {
     import: { title: '批量导入', desc: '从 Excel 文件批量导入学员数据' },
     requests: { title: '入校申请', desc: '审批学员的入校咨询申请' },
     'admin-manage': { title: '管理员管理', desc: '管理后台管理员账号' },
+    tips: { title: '温馨提示', desc: '为班级设置温馨提示' },
     accounts: { title: '账户管理', desc: '查看和管理学员登录账户' }
 };
 
@@ -1050,6 +1147,7 @@ function switchPage(page, navEl) {
     if (page === 'students') loadStudents();
     if (page === 'requests') loadRequests();
     if (page === 'admin-manage') loadAdmins();
+    if (page === 'tips') loadTips();
     if (page === 'accounts') loadAccounts();
 }
 
@@ -1466,7 +1564,7 @@ function loadAdmins() {
 function renderAdmins(admins) {
     const tbody = document.getElementById('adminTableBody');
     if (!admins || admins.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-text">暂无管理员</div></div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-text">暂无管理员</div></div></td></tr>';
         return;
     }
     const roleMap = { superadmin: '超级管理员', admin: '管理员' };
@@ -1476,13 +1574,15 @@ function renderAdmins(admins) {
         const isDefault = a.phone === 'admin';
         const isSelf = a.phone === currentPhone;
         const created = a.createdAt ? new Date(a.createdAt).toLocaleDateString('zh-CN') : '-';
+        const classes = (a.classes && a.classes.length > 0) ? a.classes.join('、') : '<span style="color:#999">未分配</span>';
         return `<tr>
             <td><strong>${a.name}</strong></td>
             <td>${a.phone} ${isDefault ? '<span class="tag tag-approved" style="font-size:11px;">默认</span>' : ''}</td>
             <td>${roleMap[a.role] || a.role}</td>
+            <td style="font-size:12px;">${classes}</td>
             <td>${created}</td>
             <td>
-                ${isSuperAdmin ? `<button class="btn btn-ghost btn-sm" onclick="editAdmin('${a.id}','${a.name}','${a.phone}','${a.role}')" title="编辑">✏️</button>` : ''}
+                ${isSuperAdmin ? `<button class="btn btn-ghost btn-sm" onclick='editAdmin("${a.id}","${a.name}","${a.phone}","${a.role}",${JSON.stringify(a.classes || [])})' title="编辑">✏️</button>` : ''}
                 ${isSuperAdmin && !isDefault && !isSelf ? `<button class="btn btn-ghost btn-sm" onclick="deleteAdmin('${a.id}','${a.name}')" title="删除">🗑️</button>` : ''}
             </td>
         </tr>`;
@@ -1495,10 +1595,11 @@ function showAddAdminModal() {
     document.getElementById('adminRole').value = 'admin';
     document.getElementById('pwdRequired').style.display = '';
     document.getElementById('pwdHint').style.display = 'none';
+    loadClassesForAdmin([]);
     document.getElementById('adminModal').classList.add('show');
 }
 
-function editAdmin(id, name, phone, role) {
+function editAdmin(id, name, phone, role, classes) {
     document.getElementById('adminModalTitle').textContent = '编辑管理员';
     document.getElementById('editAdminId').value = id;
     document.getElementById('adminName').value = name;
@@ -1507,7 +1608,27 @@ function editAdmin(id, name, phone, role) {
     document.getElementById('adminRole').value = role || 'admin';
     document.getElementById('pwdRequired').style.display = 'none';
     document.getElementById('pwdHint').style.display = '';
+    loadClassesForAdmin(classes || []);
     document.getElementById('adminModal').classList.add('show');
+}
+
+function loadClassesForAdmin(selectedClasses) {
+    fetch(`${API_BASE}/classes`).then(r => r.json()).then(res => {
+        const container = document.getElementById('adminClassesContainer');
+        if (!res.success || !res.data || res.data.length === 0) {
+            container.innerHTML = '<div style="color:#999;font-size:13px;">暂无班级数据</div>';
+            return;
+        }
+        container.innerHTML = res.data.map(c =>
+            `<label style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:13px;cursor:pointer;">
+                <input type="checkbox" class="admin-class-check" value="${c}" ${selectedClasses.includes(c) ? 'checked' : ''}> ${c}
+            </label>`
+        ).join('');
+    });
+}
+
+function getSelectedClasses() {
+    return [...document.querySelectorAll('.admin-class-check:checked')].map(cb => cb.value);
 }
 
 function closeAdminModal() {
@@ -1520,10 +1641,11 @@ function saveAdmin() {
     const phone = document.getElementById('adminPhone').value.trim();
     const password = document.getElementById('adminPwd').value.trim();
     const role = document.getElementById('adminRole').value;
+    const classes = getSelectedClasses();
     if (!name || !phone) return showToast('请填写姓名和账号', 'error');
     if (!editId && !password) return showToast('请填写密码', 'error');
 
-    const data = { name, phone, role };
+    const data = { name, phone, role, classes };
     if (password) data.password = password;
 
     if (editId) {
@@ -1564,6 +1686,123 @@ function showToast(msg, type = 'success') {
 }
 
 document.getElementById('loginPassword').addEventListener('keyup', e => { if (e.key === 'Enter') doLogin(); });
+
+// ============ 温馨提示管理 ============
+function loadTips() {
+    fetch(`${API_BASE}/tips`).then(r => r.json()).then(res => {
+        if (res.success) renderTips(res.data || []);
+    });
+}
+
+function renderTips(tips) {
+    const tbody = document.getElementById('tipTableBody');
+    if (tips.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">💡</div><div class="empty-text">暂无温馨提示</div><div class="empty-hint">点击下方按钮添加</div></div></td></tr>';
+        return;
+    }
+    tbody.innerHTML = tips.map(t => {
+        const time = t.updatedAt ? new Date(t.updatedAt).toLocaleString('zh-CN') : '-';
+        return `<tr>
+            <td><strong>${t.className}</strong></td>
+            <td style="max-width:400px;white-space:pre-wrap;">${t.content || '<span style="color:#999">空</span>'}</td>
+            <td>${time}</td>
+            <td>
+                <button class="btn btn-ghost btn-sm" onclick="editTip('${t._id}','${t.className}',${JSON.stringify(t.content || '')})">✏️</button>
+                <button class="btn btn-ghost btn-sm" onclick="deleteTip('${t._id}','${t.className}')">🗑️</button>
+            </td>
+        </tr>`;
+    }).join('');
+    // 添加新按钮
+    tbody.innerHTML += `<tr><td colspan="4" style="border:none;padding-top:12px;">
+        <button class="btn btn-primary btn-sm" onclick="showAddTipModal()">＋ 添加温馨提示</button>
+    </td></tr>`;
+}
+
+function showAddTipModal() {
+    document.getElementById('tipModalTitle').textContent = '添加温馨提示';
+    document.getElementById('editTipId').value = '';
+    document.getElementById('tipClassName').value = '';
+    document.getElementById('tipContent').value = '';
+    loadClassOptions();
+    document.getElementById('tipModal').classList.add('show');
+}
+
+function editTip(id, className, content) {
+    document.getElementById('tipModalTitle').textContent = '编辑温馨提示';
+    document.getElementById('editTipId').value = id;
+    document.getElementById('tipContent').value = content;
+    loadClassOptions(className);
+    document.getElementById('tipModal').classList.add('show');
+}
+
+function loadClassOptions(selected) {
+    fetch(`${API_BASE}/classes`).then(r => r.json()).then(res => {
+        const sel = document.getElementById('tipClassName');
+        sel.innerHTML = '<option value="">请选择班级</option>';
+        if (res.success && res.data) {
+            res.data.forEach(c => {
+                sel.innerHTML += `<option value="${c}" ${c === selected ? 'selected' : ''}>${c}</option>`;
+            });
+        }
+    });
+}
+
+function closeTipModal() { document.getElementById('tipModal').classList.remove('show'); }
+
+function saveTip() {
+    const id = document.getElementById('editTipId').value;
+    const className = document.getElementById('tipClassName').value;
+    const content = document.getElementById('tipContent').value.trim();
+    if (!className) return showToast('请选择班级', 'error');
+    fetch(`${API_BASE}/tips`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ className, content })
+    }).then(r => r.json()).then(res => {
+        if (res.success) { showToast(res.message); closeTipModal(); loadTips(); } else showToast(res.message, 'error');
+    });
+}
+
+function deleteTip(id, className) {
+    if (!confirm(`确定删除「${className}」的温馨提示？`)) return;
+    fetch(`${API_BASE}/tips/${id}`, { method: 'DELETE' }).then(r => r.json()).then(res => {
+        if (res.success) { showToast(res.message); loadTips(); } else showToast(res.message, 'error');
+    });
+}
+
+// ============ 管理员批量导入 ============
+function showAdminImportModal() {
+    document.getElementById('adminImportResult').innerHTML = '';
+    document.getElementById('adminFileInput').value = '';
+    document.getElementById('adminImportModal').classList.add('show');
+}
+function closeAdminImportModal() { document.getElementById('adminImportModal').classList.remove('show'); }
+
+const adminUploadZone = document.getElementById('adminUploadZone');
+if (adminUploadZone) {
+    adminUploadZone.addEventListener('click', () => document.getElementById('adminFileInput').click());
+}
+
+function handleAdminFileSelect(e) {
+    if (!e.target.files.length) return;
+    const file = e.target.files[0];
+    if (!file.name.match(/\.xlsx?$/i)) return showToast('请选择 Excel 文件', 'error');
+    const formData = new FormData();
+    formData.append('file', file);
+    document.getElementById('adminImportResult').innerHTML = '<div class="result-box result-info"><span class="result-icon">⏳</span><div>正在导入...</div></div>';
+    fetch(`${API_BASE}/admins/import`, { method: 'POST', body: formData }).then(r => r.json()).then(res => {
+        if (res.success) {
+            const d = res.data;
+            let html = `<div class="result-box result-success"><span class="result-icon">✅</span><div>导入完成：共 ${d.total} 条，成功 ${d.added} 条，失败 ${d.failed} 条</div></div>`;
+            if (d.errors && d.errors.length > 0) {
+                html += '<div class="error-list">' + d.errors.map(e => `<div class="error-item">⚠️ ${e}</div>`).join('') + '</div>';
+            }
+            document.getElementById('adminImportResult').innerHTML = html;
+            loadAdmins();
+        } else {
+            document.getElementById('adminImportResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">❌</span><div>${res.message}</div></div>`;
+        }
+    });
+}
 </script>
 </body>
 </html>
