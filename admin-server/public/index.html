@@ -756,10 +756,10 @@
                     <div class="toolbar">
                         <div class="search-box">
                             <select id="requestFilter" class="search-input" style="width:160px" onchange="loadRequests()">
+                                <option value="all">全部</option>
                                 <option value="pending">待审核</option>
                                 <option value="approved">已通过</option>
                                 <option value="rejected">已拒绝</option>
-                                <option value="all">全部</option>
                             </select>
                         </div>
                     </div>
@@ -1495,7 +1495,7 @@ function renderRequests(requests) {
                 ${r.status === 'pending' ? `
                     <button class="btn btn-success btn-sm" onclick="approveRequest('${r._id}')">✓ 通过</button>
                     <button class="btn btn-danger btn-sm" onclick="showRejectModal('${r._id}')">✕ 拒绝</button>
-                ` : '<span style="color:#999">-</span>'}
+                ` : r.status === 'approved' ? '<span class="tag tag-approved"><span class="tag-dot"></span>已通过</span>' : r.status === 'rejected' ? '<span class="tag tag-rejected"><span class="tag-dot"></span>已拒绝</span>' : '<span style="color:#999">-</span>'}
             </td>
         </tr>`;
     }).join('');

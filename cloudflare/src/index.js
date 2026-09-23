@@ -446,7 +446,7 @@ th{background:#fafafa;font-weight:600;color:var(--text2)}
 <div class="card">
 <div class="toolbar">
 <select id="requestFilter" onchange="loadRequests()">
-<option value="pending">待审核</option><option value="approved">已通过</option><option value="rejected">已拒绝</option><option value="all">全部</option>
+<option value="all">全部</option><option value="pending">待审核</option><option value="approved">已通过</option><option value="rejected">已拒绝</option>
 </select>
 </div>
 <div class="table-container"><table>
@@ -646,7 +646,7 @@ tbody.innerHTML=requests.map(r=>{
 const exp=r.status==='approved'&&r.entryEndTime&&now>new Date(r.entryEndTime);
 let st,sc;if(exp){st='已过期';sc='tag-expired';}else{[st,sc]=sm[r.status]||['未知',''];}
 const t=r.createdAt?new Date(r.createdAt).toLocaleString('zh-CN'):'-';
-return '<tr><td><b>'+r.name+'</b></td><td>'+r.phone+'</td><td>'+(r.carPlate||'-')+'</td><td>'+(r.entryDate||'-')+'</td><td>'+(r.entryStartTime?r.entryStartTime+' - '+r.entryEndTime:'-')+'</td><td>'+t+'</td><td><span class="tag '+sc+'"><span class="tag-dot"></span>'+st+'</span></td><td>'+(r.status==='pending'?'<button class="btn btn-success btn-sm" onclick="approveReq(\\''+r._id+'\\')">通过</button> <button class="btn btn-danger btn-sm" onclick="rejectReq(\\''+r._id+'\\')">拒绝</button>':'-')+'</td></tr>';
+return '<tr><td><b>'+r.name+'</b></td><td>'+r.phone+'</td><td>'+(r.carPlate||'-')+'</td><td>'+(r.entryDate||'-')+'</td><td>'+(r.entryStartTime?r.entryStartTime+' - '+r.entryEndTime:'-')+'</td><td>'+t+'</td><td><span class="tag '+sc+'"><span class="tag-dot"></span>'+st+'</span></td><td>'+(r.status==='pending'?'<button class="btn btn-success btn-sm" onclick="approveReq(\\''+r._id+'\\')">通过</button> <button class="btn btn-danger btn-sm" onclick="rejectReq(\\''+r._id+'\\')">拒绝</button>':r.status==='approved'?'<span class="tag tag-approved"><span class="tag-dot"></span>已通过</span>':r.status==='rejected'?'<span class="tag tag-rejected"><span class="tag-dot"></span>已拒绝</span>':'-')+'</td></tr>';
 }).join('');
 }
 async function approveReq(id){if(!confirm('通过此申请？'))return;const r=await api('/api/requests/'+id+'/approve',{});if(r.success){toast('已通过');loadRequests();}else toast(r.message);}
