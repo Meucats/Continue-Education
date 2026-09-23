@@ -1,4 +1,4 @@
-# 本机启动管理后台（admin-server / Express）
+﻿# 本机启动管理后台（admin-server / Express）
 $ErrorActionPreference = "Stop"
 Set-Location -LiteralPath "$PSScriptRoot"
 

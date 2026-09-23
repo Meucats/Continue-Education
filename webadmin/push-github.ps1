@@ -1,4 +1,4 @@
-# Git 推送到 GitHub（需先在 GitHub 建好空仓库）
+﻿# Git 推送到 GitHub（需先在 GitHub 建好空仓库）
 # 用法: .\push-github.ps1 -RepoUrl https://github.com/你的用户名/仓库名.git
 param(
   [Parameter(Mandatory = $true)]

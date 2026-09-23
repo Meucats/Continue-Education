@@ -1,4 +1,4 @@
-# Cloudflare Workers 一键部署（请在浏览器已登录 dash.cloudflare.com 后执行）
+﻿# Cloudflare Workers 一键部署（请在浏览器已登录 dash.cloudflare.com 后执行）
 $ErrorActionPreference = "Stop"
 Set-Location -LiteralPath "$PSScriptRoot"
 
