@@ -1,0 +1,40 @@
+# 依赖
+node_modules/
+.npm/
+
+# 本地密钥与运行时数据（勿提交）
+**/config.json
+!**/config.example.json
+**/.token-secret
+**/admins.json
+webadmin/admin-server/data/
+webadmin/admin-server/uploads/
+admin-server/data/
+admin-server/uploads/
+uploads/
+package-lock.json
+webadmin/.env
+.env
+.env.*
+!.env.example
+
+# 小程序不进本仓库（用微信开发者工具上传）
+wxminiprogram/
+
+# 系统
+.DS_Store
+Thumbs.db
+*.log
+*.local
+
+# 缓存
+.wrangler/
+.cache/
+dist/
+temp/
+__pycache__/
+
+# 临时/草稿
+新建 文本文档.txt
+wxminiprogram/project.private.config.json
+**/~$*

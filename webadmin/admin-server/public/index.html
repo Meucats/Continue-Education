@@ -1,0 +1,3257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>杭职大继续教育学院 - 管理后台</title>
+    <style>
+        :root {
+            --accent: #1558c7;
+            --accent-strong: #11489f;
+            --accent-soft: #e9f1fc;
+            --accent-ring: rgba(21, 88, 199, 0.22);
+            --accent-line: #c8dbf6;
+            --bg: #f3f4f7;
+            --surface: #ffffff;
+            --surface-2: #f8f9fb;
+            --ink: #1b1f27;
+            --ink-2: #55606e;
+            --ink-3: #6b7482;
+            --line: #e4e7ec;
+            --line-strong: #d3d8e0;
+            --success: #0f7a3d;
+            --success-bg: #e8f6ee;
+            --success-line: #c6ead4;
+            --warning: #a45a09;
+            --warning-bg: #fdf2e3;
+            --warning-line: #f3ddbe;
+            --danger: #c02626;
+            --danger-bg: #fdecec;
+            --danger-line: #f8cfcf;
+            --neutral: #5a6472;
+            --neutral-bg: #eef1f5;
+            --side: #2a3348;
+            --side-ink: #eef2f8;
+            --side-ink-2: #c5cedd;
+            --side-line: rgba(255, 255, 255, 0.1);
+            --side-hover: rgba(255, 255, 255, 0.1);
+            --side-active: #1f6ae0;
+            --r-card: 16px;
+            --r-ctrl: 10px;
+            --r-pill: 999px;
+            --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.05);
+            --shadow-2: 0 4px 12px -2px rgba(16, 24, 40, 0.08), 0 2px 6px -2px rgba(16, 24, 40, 0.05);
+            --shadow-3: 0 24px 48px -12px rgba(16, 24, 40, 0.18);
+            --font: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { color-scheme: light; }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--ink);
+            line-height: 1.5;
+            font-size: 14px;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+            overflow-x: hidden;
+        }
+
+        ::selection { background: var(--accent-soft); color: var(--ink); }
+
+        :focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+
+        .ico {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .ico-sm { width: 15px; height: 15px; }
+        .ico-lg { width: 22px; height: 22px; }
+        .spin { animation: spin 0.9s linear infinite; transform-origin: center; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .hidden { display: none !important; }
+
+        .num { font-variant-numeric: tabular-nums; }
+
+        /* 登录页 */
+        .login-container {
+            display: grid;
+            grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+            grid-template-rows: minmax(0, 1fr) auto;
+            min-height: 100vh;
+            background: var(--bg);
+        }
+        .login-brand {
+            background:
+                radial-gradient(ellipse 80% 60% at 20% 10%, rgba(255, 255, 255, 0.12), transparent 55%),
+                radial-gradient(ellipse 70% 50% at 85% 85%, rgba(13, 53, 117, 0.55), transparent 50%),
+                linear-gradient(165deg, #0e3a8a 0%, var(--accent) 48%, #0a2d6b 100%);
+            color: #fff;
+            padding: 56px 48px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+        }
+        .login-brand::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+            background-size: 48px 48px;
+            mask-image: radial-gradient(ellipse 70% 70% at 50% 40%, #000 20%, transparent 75%);
+            pointer-events: none;
+        }
+        .login-brand::after {
+            content: '';
+            position: absolute;
+            right: -100px;
+            bottom: -140px;
+            width: 380px;
+            height: 380px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 50%;
+            box-shadow:
+                0 0 0 70px rgba(255, 255, 255, 0.035),
+                0 0 0 140px rgba(255, 255, 255, 0.02);
+            pointer-events: none;
+        }
+        .brand-mark {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            position: relative;
+            z-index: 1;
+        }
+        .brand-mark .mark-box {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid rgba(255, 255, 255, 0.55);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.35);
+            overflow: hidden;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
+        .brand-mark .mark-box .school-logo {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 4px;
+            box-sizing: border-box;
+        }
+        .brand-mark h1 { font-size: 17px; font-weight: 650; letter-spacing: 0.02em; }
+        .brand-mark p {
+            font-size: 12.5px;
+            color: rgba(255, 255, 255, 0.72);
+            margin-top: 2px;
+            letter-spacing: 0.08em;
+        }
+        .login-brand-copy { position: relative; z-index: 1; max-width: 36ch; }
+        .login-brand-copy h2 {
+            font-size: 36px;
+            line-height: 1.22;
+            font-weight: 700;
+            letter-spacing: -0.015em;
+            text-wrap: balance;
+            margin-bottom: 16px;
+        }
+        .login-brand-copy h2 span {
+            display: inline-block;
+            background: linear-gradient(90deg, #fff 0%, rgba(255, 255, 255, 0.75) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .login-brand-copy p {
+            font-size: 14.5px;
+            line-height: 1.75;
+            color: rgba(255, 255, 255, 0.78);
+            max-width: 32ch;
+        }
+        .login-brand-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 22px;
+            position: relative;
+            z-index: 1;
+        }
+        .login-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.88);
+            letter-spacing: 0.02em;
+        }
+        .login-pill .ico { width: 13px; height: 13px; opacity: 0.9; }
+        .login-brand-foot {
+            position: relative;
+            z-index: 1;
+            font-size: 12.5px;
+            color: rgba(255, 255, 255, 0.55);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .login-brand-foot .ico { width: 14px; height: 14px; }
+
+        .login-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 32px;
+            background:
+                radial-gradient(ellipse 50% 40% at 80% 0%, var(--accent-soft), transparent 60%),
+                var(--bg);
+            position: relative;
+        }
+        .login-footer {
+            grid-column: 1 / -1;
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            padding: 16px 48px;
+            background:
+                radial-gradient(ellipse 70% 160% at 6% -40%, rgba(31, 106, 224, 0.32), transparent 52%),
+                linear-gradient(180deg, #0d367c 0%, #0a2d6b 100%);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            font-size: 12.5px;
+            color: rgba(255, 255, 255, 0.6);
+            letter-spacing: 0.01em;
+        }
+        .login-footer .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+        .login-footer .footer-dot {
+            width: 7px;
+            height: 7px;
+            background: #2fbd6a;
+            box-shadow: 0 0 0 3px rgba(47, 189, 106, 0.16);
+            animation: footerPulse 2.6s ease-in-out infinite;
+        }
+        @keyframes footerPulse {
+            0%, 100% { box-shadow: 0 0 0 3px rgba(47, 189, 106, 0.16); }
+            50% { box-shadow: 0 0 0 5px rgba(47, 189, 106, 0.06); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .login-footer .footer-dot { animation: none; }
+        }
+        .login-footer .footer-links {
+            display: flex;
+            align-items: center;
+        }
+        .login-footer .footer-links > * + * {
+            position: relative;
+            padding-left: 16px;
+            margin-left: 16px;
+        }
+        .login-footer .footer-links > * + *::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 1px;
+            height: 11px;
+            background: rgba(255, 255, 255, 0.18);
+        }
+        .login-footer a {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: rgba(255, 255, 255, 0.82);
+            text-decoration: none;
+            transition: color 0.15s ease;
+        }
+        .login-footer a .ico {
+            width: 13px;
+            height: 13px;
+            opacity: 0.85;
+        }
+        .login-footer a:hover { color: #fff; }
+        .login-footer a:hover .ico { opacity: 1; }
+        .login-footer .footer-version {
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.04em;
+            color: rgba(255, 255, 255, 0.52);
+        }
+        .login-box {
+            width: 100%;
+            max-width: 400px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            padding: 40px 36px 36px;
+            box-shadow:
+                0 1px 2px rgba(16, 24, 40, 0.04),
+                0 12px 40px -12px rgba(16, 24, 40, 0.1);
+            position: relative;
+        }
+        .login-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+        .login-logo {
+            width: 72px;
+            height: 72px;
+            flex-shrink: 0;
+            border-radius: 16px;
+            background: linear-gradient(180deg, #f8fafc 0%, #eef3fa 100%);
+            border: 1px solid var(--accent-line);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 14px -6px rgba(21, 88, 199, 0.2);
+            overflow: hidden;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .login-logo .school-logo {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .login-header-copy { min-width: 0; }
+        .login-title {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.015em;
+            color: var(--ink);
+        }
+        .login-subtitle {
+            margin: 6px 0 0;
+            color: var(--ink-2);
+            font-size: 14px;
+            line-height: 1.55;
+        }
+        .login-form { margin-top: 4px; }
+        .login-form .form-group:last-of-type { margin-bottom: 14px; }
+        .login-options {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: var(--ink-2);
+        }
+        .remember-me {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .remember-me input[type="checkbox"] {
+            width: 15px;
+            height: 15px;
+            margin: 0;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+        .remember-hint { font-size: 11.5px; color: var(--ink-3); }
+        .login-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 18px;
+            font-size: 12.5px;
+            color: var(--ink-3);
+        }
+        .login-meta a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 550;
+        }
+        .login-meta a:hover { text-decoration: underline; text-underline-offset: 3px; }
+        .login-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 22px 0 0;
+            font-size: 12px;
+            color: var(--ink-3);
+        }
+        .login-divider::before,
+        .login-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--line);
+        }
+        .login-help {
+            margin-top: 14px;
+            text-align: center;
+            font-size: 12.5px;
+            color: var(--ink-3);
+            line-height: 1.6;
+        }
+
+        .form-group { margin-bottom: 18px; }
+        .form-label { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 600; color: var(--ink); }
+        .form-input {
+            width: 100%;
+            height: 46px;
+            padding: 0 14px;
+            border: 1px solid var(--line-strong);
+            border-radius: 12px;
+            font-size: 14.5px;
+            font-family: inherit;
+            color: var(--ink);
+            background: var(--surface-2);
+            outline: none;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+        }
+        .form-input:hover { border-color: #b9c0cb; background: var(--surface); }
+        .form-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-ring);
+            background: var(--surface);
+        }
+        .form-input::placeholder { color: var(--ink-3); }
+        .form-select {
+            width: 100%;
+            height: 44px;
+            padding: 0 14px;
+            border: 1px solid var(--line-strong);
+            border-radius: var(--r-ctrl);
+            font-size: 14.5px;
+            font-family: inherit;
+            color: var(--ink);
+            background: var(--surface);
+            outline: none;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+        }
+        .form-select:hover { border-color: #b9c0cb; }
+        .form-select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-ring);
+            background: var(--surface);
+        }
+        .form-textarea {
+            width: 100%;
+            min-height: 96px;
+            padding: 11px 14px;
+            border: 1px solid var(--line-strong);
+            border-radius: var(--r-ctrl);
+            font-size: 14.5px;
+            font-family: inherit;
+            color: var(--ink);
+            background: var(--surface);
+            outline: none;
+            resize: vertical;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .form-textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+        .form-textarea::placeholder { color: var(--ink-3); }
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+            gap: 14px;
+        }
+        .required { color: var(--danger); }
+        .form-hint { display: block; margin-top: 6px; font-size: 12px; color: var(--ink-3); }
+
+        input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        /* 按钮 */
+        .btn {
+            height: 40px;
+            padding: 0 16px;
+            border: 1px solid transparent;
+            border-radius: var(--r-ctrl);
+            font-size: 14px;
+            font-weight: 550;
+            font-family: inherit;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            white-space: nowrap;
+            transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+            text-decoration: none;
+        }
+        .btn:hover { box-shadow: var(--shadow-1); }
+        .btn:active { transform: scale(0.96); box-shadow: none; }
+        .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent-strong); }
+        .btn-success { background: var(--success); color: #fff; }
+        .btn-success:hover { background: #0c6532; }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { background: #a41f1f; }
+        .btn-warning { background: var(--warning); color: #fff; }
+        .btn-warning:hover { background: #8a4b07; }
+        .btn-secondary { background: var(--surface); color: var(--ink-2); border-color: var(--line-strong); }
+        .btn-secondary:hover { background: var(--surface-2); color: var(--ink); }
+        .btn-ghost { background: transparent; color: var(--ink-2); }
+        .btn-ghost:hover { background: var(--neutral-bg); color: var(--ink); box-shadow: none; }
+        .btn-sm { height: 32px; padding: 0 11px; font-size: 13px; border-radius: 8px; gap: 5px; }
+        .btn-block {
+            width: 100%;
+            height: 48px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 12px;
+            letter-spacing: 0.04em;
+        }
+        .btn-block:hover { box-shadow: 0 6px 16px -6px rgba(21, 88, 199, 0.45); }
+        .btn-icon { width: 32px; padding: 0; }
+
+        /* 布局 */
+        .admin-layout {
+            display: flex;
+            min-height: 100vh;
+            overflow-x: clip;
+        }
+
+        .sidebar {
+            width: 244px;
+            background: var(--side);
+            color: #fff;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            z-index: 50;
+        }
+        .sidebar-brand {
+            padding: 20px 18px;
+            border-bottom: 1px solid var(--side-line);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .brand-icon {
+            width: 44px;
+            height: 44px;
+            background: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            overflow: hidden;
+            box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.25);
+            border: 1.5px solid rgba(255, 255, 255, 0.35);
+            box-sizing: border-box;
+        }
+        .brand-icon .school-logo {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 3px;
+            box-sizing: border-box;
+        }
+        .brand-text h3 { font-size: 14.5px; font-weight: 650; line-height: 1.3; color: #fff; }
+        .brand-text p { font-size: 11.5px; color: var(--side-ink-2); margin-top: 1px; }
+
+        .nav-menu { padding: 14px 10px; flex: 1; }
+        .nav-section { margin-bottom: 14px; }
+        .nav-section:last-child { margin-bottom: 0; }
+        .nav-section-title {
+            padding: 6px 10px 7px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--side-ink-2);
+            letter-spacing: 0.06em;
+        }
+        .nav-item {
+            padding: 9px 10px;
+            cursor: pointer;
+            transition: background-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13.5px;
+            color: var(--side-ink);
+            border-radius: 9px;
+            margin-bottom: 2px;
+            min-height: 40px;
+        }
+        .nav-item:hover { background: var(--side-hover); color: #fff; }
+        .nav-item:active { transform: scale(0.985); }
+            .nav-item.active { background: var(--side-active); color: #fff; font-weight: 600; }
+        .nav-icon { width: 20px; display: flex; align-items: center; justify-content: center; }
+        .nav-icon .ico { width: 17px; height: 17px; }
+        .nav-badge {
+            margin-left: auto;
+            background: var(--danger);
+            color: #fff;
+            font-size: 11px;
+            padding: 1px 7px;
+            border-radius: var(--r-pill);
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            min-width: 20px;
+            text-align: center;
+        }
+
+        .sidebar-footer { padding: 12px 10px 16px; border-top: 1px solid var(--side-line); }
+
+        .sidebar-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(16, 24, 40, 0.45);
+            z-index: 45;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .sidebar-backdrop.show {
+            display: block;
+            opacity: 1;
+        }
+
+        .menu-toggle {
+            display: none;
+            width: 40px;
+            height: 40px;
+            border: 1px solid var(--line);
+            background: var(--surface);
+            border-radius: 10px;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            color: var(--ink-2);
+            transition: background-color 0.15s ease, border-color 0.15s ease;
+        }
+        .menu-toggle:hover { background: var(--surface-2); border-color: var(--line-strong); }
+        .menu-toggle .ico { width: 18px; height: 18px; }
+
+        .main-content {
+            margin-left: 244px;
+            flex: 1;
+            min-height: 100vh;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .topbar {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(8px);
+            padding: clamp(12px, 1.5vw, 16px) clamp(14px, 3vw, 36px);
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            gap: clamp(10px, 1.5vw, 16px);
+            min-width: 0;
+        }
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+        .page-header { min-width: 0; }
+        .page-header h2 { font-size: 18px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; text-wrap: balance; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .page-header p { font-size: 12.5px; color: var(--ink-2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: min(52vw, 420px); }
+        .topbar-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .admin-avatar {
+            width: 36px;
+            height: 36px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 650;
+        }
+        .admin-name { font-size: 13.5px; color: var(--ink-2); font-weight: 550; white-space: nowrap; }
+
+        .page-body {
+            padding: clamp(16px, 2vw, 28px) clamp(14px, 3vw, 36px) clamp(28px, 3vw, 44px);
+            width: 100%;
+            max-width: none;
+            margin-inline: 0;
+            flex: 1;
+            box-sizing: border-box;
+            min-width: 0;
+        }
+        .page-content { animation: pageIn 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes pageIn { from { opacity: 0; transform: translateY(6px); } }
+
+        .page-footer {
+            margin-top: auto;
+            padding: 16px clamp(14px, 3vw, 36px);
+            border-top: 1px solid var(--line);
+            background: var(--surface);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 12.5px;
+            color: var(--ink-3);
+        }
+        .page-footer a {
+            color: var(--ink-2);
+            text-decoration: none;
+            transition: color 0.15s ease;
+        }
+        .page-footer a:hover { color: var(--accent); }
+        .footer-links { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+        .footer-brand { display: flex; align-items: center; gap: 8px; }
+        .footer-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); flex-shrink: 0; }
+
+        /* 卡片 */
+        .card {
+            background: var(--surface);
+            border-radius: var(--r-card);
+            padding: clamp(14px, 2vw, 22px);
+            box-shadow: var(--shadow-1);
+            margin-bottom: clamp(14px, 2vw, 20px);
+            border: 1px solid var(--line);
+            min-width: 0;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid var(--line);
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .card-title { font-size: 15.5px; font-weight: 650; color: var(--ink); }
+
+        /* 统计卡片：流式 4→3→2→1 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+            gap: clamp(12px, 1.6vw, 18px);
+            margin-bottom: clamp(18px, 2vw, 24px);
+        }
+        .stat-card {
+            background: var(--surface);
+            border-radius: var(--r-card);
+            padding: 20px;
+            box-shadow: var(--shadow-1);
+            border: 1px solid var(--line);
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 12px;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+        }
+        .stat-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow-2); }
+        .stat-card:active { transform: scale(0.985); }
+        .stat-card[onclick] { cursor: pointer; }
+        .stat-info { min-width: 0; }
+        .stat-label {
+            font-size: 12.5px;
+            color: var(--ink-2);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .stat-label .ico { width: 15px; height: 15px; color: var(--ink-3); }
+        .stat-number {
+            font-size: 30px;
+            font-weight: 700;
+            color: var(--ink);
+            line-height: 1.1;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.02em;
+        }
+        .stat-arrow {
+            color: var(--ink-3);
+            display: flex;
+            transition: transform 0.15s ease, color 0.15s ease;
+            padding-bottom: 4px;
+        }
+        .stat-card:hover .stat-arrow { color: var(--accent); transform: translateX(3px); }
+        .stat-card[data-tone="warning"] .stat-number { color: var(--warning); }
+        .stat-card[data-tone="success"] .stat-number { color: var(--success); }
+
+        /* 表格：占满容器；短字段不换行，长字段可换行以适配宽度 */
+        .table-container {
+            overflow-x: auto;
+            margin: 0 -4px;
+            padding: 0 4px;
+            max-width: 100%;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-x: contain;
+        }
+        table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        th, td {
+            padding: 11px 12px;
+            text-align: left;
+            font-size: 13.5px;
+            border-bottom: 1px solid var(--line);
+            white-space: nowrap;
+            vertical-align: top;
+        }
+        /* 长文本列：允许换行，避免为放不下的宽度强行出横向滚动 */
+        td.cell-wrap,
+        th.cell-wrap {
+            white-space: normal;
+            word-break: break-word;
+            min-width: 72px;
+            max-width: 240px;
+        }
+        td.cell-wrap {
+            line-height: 1.45;
+        }
+        th {
+            background: var(--surface-2);
+            font-weight: 600;
+            color: var(--ink-2);
+            font-size: 12px;
+            letter-spacing: 0.03em;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        th:first-child { border-radius: 8px 0 0 8px; }
+        th:last-child { border-radius: 0 8px 8px 0; }
+        tbody tr { transition: background-color 0.12s ease; }
+        tr:hover td { background: var(--surface-2); }
+        td { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+        td strong { color: var(--ink); font-weight: 600; }
+        td .row-actions { display: flex; gap: 2px; }
+        .code-chip {
+            background: var(--neutral-bg);
+            color: var(--ink);
+            padding: 2px 7px;
+            border-radius: 6px;
+            font-size: 12.5px;
+            font-family: ui-monospace, "SF Mono", Consolas, monospace;
+            font-variant-numeric: tabular-nums;
+        }
+        .sub-note { display: block; margin-top: 3px; font-size: 11.5px; color: var(--accent); }
+
+        /* 标签 */
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 10px;
+            border-radius: var(--r-pill);
+            font-size: 12px;
+            font-weight: 550;
+            line-height: 1.6;
+        }
+        .tag-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+        .tag-pending { background: var(--warning-bg); color: var(--warning); }
+        .tag-pending .tag-dot { background: var(--warning); }
+        .tag-approved { background: var(--success-bg); color: var(--success); }
+        .tag-approved .tag-dot { background: var(--success); }
+        .tag-rejected { background: var(--danger-bg); color: var(--danger); }
+        .tag-rejected .tag-dot { background: var(--danger); }
+        .tag-expired { background: var(--neutral-bg); color: var(--neutral); }
+        .tag-expired .tag-dot { background: var(--neutral); }
+
+        /* 搜索和工具栏 */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .search-box {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            flex: 1 1 240px;
+            min-width: 0;
+            max-width: 520px;
+        }
+        .search-input {
+            height: 38px;
+            padding: 0 13px;
+            border: 1px solid var(--line-strong);
+            border-radius: var(--r-ctrl);
+            font-size: 14px;
+            font-family: inherit;
+            width: 270px;
+            flex: 1 1 180px;
+            min-width: 0;
+            max-width: 100%;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+            background: var(--surface);
+            color: var(--ink);
+        }
+        .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+        .search-input::placeholder { color: var(--ink-3); }
+        select.search-input { cursor: pointer; width: auto; min-width: 140px; max-width: 100%; }
+        .toolbar-group { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        /* 上传区域 */
+        .upload-zone {
+            border: 1.5px dashed var(--line-strong);
+            border-radius: var(--r-card);
+            padding: 44px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.15s ease, background-color 0.15s ease;
+            background: var(--surface-2);
+        }
+        .upload-zone:hover { border-color: var(--accent); background: var(--accent-soft); }
+        .upload-zone.dragover { border-color: var(--accent); background: var(--accent-soft); border-style: solid; }
+        .upload-icon {
+            width: 52px;
+            height: 52px;
+            margin: 0 auto 14px;
+            border-radius: 14px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-1);
+        }
+        .upload-icon .ico { width: 24px; height: 24px; }
+        .upload-text { font-size: 15px; font-weight: 550; color: var(--ink); margin-bottom: 6px; }
+        .upload-hint { font-size: 12.5px; color: var(--ink-3); }
+
+        /* 结果显示 */
+        .result-box {
+            padding: 14px 16px;
+            border-radius: 12px;
+            margin-top: 14px;
+            display: flex;
+            align-items: flex-start;
+            gap: 11px;
+            font-size: 13.5px;
+            line-height: 1.6;
+        }
+        .result-box .result-icon { flex-shrink: 0; margin-top: 1px; display: flex; }
+        .result-box .result-icon .ico { width: 18px; height: 18px; }
+        .result-success { background: var(--success-bg); border: 1px solid var(--success-line); color: #0c5f31; }
+        .result-error { background: var(--danger-bg); border: 1px solid var(--danger-line); color: #9c1e1e; }
+        .result-info { background: var(--accent-soft); border: 1px solid var(--accent-line); color: #10428f; }
+        .error-list { margin-top: 10px; max-height: 200px; overflow-y: auto; }
+        .error-item {
+            font-size: 12.5px;
+            padding: 5px 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 7px;
+            color: inherit;
+        }
+        .error-item .ico { width: 14px; height: 14px; margin-top: 3px; flex-shrink: 0; }
+
+        /* 模态框 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(16, 24, 40, 0.45);
+            backdrop-filter: blur(3px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: var(--surface);
+            border-radius: var(--r-card);
+            padding: 0;
+            width: 540px;
+            max-width: 100%;
+            max-height: 90vh;
+            box-shadow: var(--shadow-3);
+            animation: modalIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+            border: 1px solid var(--line);
+            display: flex;
+            flex-direction: column;
+        }
+        @keyframes modalIn { from { opacity: 0; transform: scale(0.97) translateY(8px); } }
+        .modal-header {
+            padding: 18px 22px;
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+        .modal-title { font-size: 16.5px; font-weight: 700; letter-spacing: -0.01em; }
+        .modal-close {
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            border: none;
+            background: var(--neutral-bg);
+            cursor: pointer;
+            color: var(--ink-2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.15s ease, color 0.15s ease, transform 0.12s ease;
+        }
+        .modal-close:hover { background: var(--line); color: var(--ink); }
+        .modal-close:active { transform: scale(0.94); }
+        .modal-close .ico { width: 16px; height: 16px; }
+        .modal-body { padding: 22px; overflow-y: auto; }
+        .modal-footer {
+            padding: 14px 22px;
+            border-top: 1px solid var(--line);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            background: var(--surface-2);
+            border-radius: 0 0 var(--r-card) var(--r-card);
+        }
+        .class-picker {
+            max-height: 130px;
+            overflow-y: auto;
+            border: 1px solid var(--line);
+            border-radius: var(--r-ctrl);
+            padding: 8px 10px;
+            background: var(--surface-2);
+        }
+        .class-picker label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 2px;
+            font-size: 13px;
+            cursor: pointer;
+            color: var(--ink-2);
+        }
+        .class-picker label:hover { color: var(--ink); }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 52px 20px;
+            color: var(--ink-3);
+        }
+        .empty-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 14px;
+            border-radius: 18px;
+            background: var(--surface-2);
+            border: 1px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--ink-3);
+        }
+        .empty-icon .ico { width: 28px; height: 28px; }
+        .empty-text { font-size: 14.5px; font-weight: 550; margin-bottom: 5px; color: var(--ink-2); }
+        .empty-hint { font-size: 12.5px; color: var(--ink-3); }
+
+        /* 骨架屏 */
+        .skeleton-cell {
+            height: 14px;
+            border-radius: 6px;
+            background: linear-gradient(90deg, var(--neutral-bg) 25%, #f6f7f9 50%, var(--neutral-bg) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s ease infinite;
+        }
+        @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+        /* 提示 */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 13.5px;
+            font-weight: 550;
+            z-index: 2000;
+            animation: toastIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            box-shadow: var(--shadow-3);
+            max-width: min(420px, calc(100vw - 40px));
+        }
+        .toast .ico { width: 17px; height: 17px; }
+        .toast-success { background: var(--success); }
+        .toast-error { background: var(--danger); }
+        .toast-info { background: var(--accent); }
+        @keyframes toastIn { from { transform: translateX(24px); opacity: 0; } }
+        .toast.out { opacity: 0; transform: translateX(24px); transition: opacity 0.25s ease, transform 0.25s ease; }
+
+        /* 滚动条 */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #b9c0cb; }
+
+        /* 提示信息条 */
+        .info-banner {
+            background: var(--accent-soft);
+            border: 1px solid var(--accent-line);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: flex-start;
+            gap: 11px;
+            font-size: 13.5px;
+            color: #10428f;
+            line-height: 1.65;
+        }
+        .info-banner .banner-icon { flex-shrink: 0; margin-top: 2px; color: var(--accent); display: flex; }
+        .info-banner .banner-icon .ico { width: 17px; height: 17px; }
+
+        /* 欢迎横幅 */
+        .welcome-banner {
+            background: linear-gradient(135deg, var(--accent) 0%, #0f4ba8 100%);
+            border-radius: var(--r-card);
+            padding: clamp(18px, 2.4vw, 28px) clamp(16px, 2.6vw, 30px);
+            margin-bottom: clamp(16px, 2vw, 22px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #fff;
+            position: relative;
+            overflow: hidden;
+            gap: clamp(12px, 2vw, 20px);
+            min-width: 0;
+        }
+        .welcome-left { min-width: 0; }
+        .welcome-text { word-break: break-word; }
+        .welcome-banner::after {
+            content: '';
+            position: absolute;
+            right: -60px;
+            top: -90px;
+            width: 260px;
+            height: 260px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .welcome-greeting { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 5px; }
+        .welcome-text { font-size: 14px; color: rgba(255, 255, 255, 0.85); margin-bottom: 10px; }
+        .welcome-date {
+            font-size: 12.5px;
+            color: rgba(255, 255, 255, 0.78);
+            font-variant-numeric: tabular-nums;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            padding: 5px 11px;
+            border-radius: var(--r-pill);
+        }
+        .welcome-right { position: relative; z-index: 1; }
+        .welcome-art {
+            width: 88px;
+            height: 60px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            padding: 8px 10px;
+            box-sizing: border-box;
+            box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.2);
+        }
+        .welcome-art .school-logo {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* 快捷操作 */
+        .quick-actions { margin-bottom: 24px; }
+        .section-title-bar { margin-bottom: 14px; }
+        .section-title-bar h3 { font-size: 15.5px; font-weight: 650; color: var(--ink); }
+        .action-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+            gap: clamp(10px, 1.4vw, 14px);
+        }
+        .action-card {
+            background: var(--surface);
+            border-radius: var(--r-card);
+            padding: 20px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow-1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        .action-card:hover { border-color: var(--accent-line); box-shadow: var(--shadow-2); transform: translateY(-2px); }
+        .action-card:active { transform: scale(0.97); }
+        .action-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 13px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .action-icon .ico { width: 21px; height: 21px; }
+        .action-text { font-size: 13.5px; font-weight: 550; color: var(--ink); }
+
+        /* 数据概览 */
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+            gap: clamp(12px, 1.6vw, 16px);
+        }
+        .overview-list { display: flex; flex-direction: column; }
+        .overview-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 13px 0;
+            border-bottom: 1px solid var(--line);
+            gap: 12px;
+        }
+        .overview-item:last-child { border-bottom: none; padding-bottom: 2px; }
+        .overview-label { font-size: 13.5px; color: var(--ink-2); }
+        .overview-value {
+            font-size: 19px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.01em;
+            color: var(--ink);
+        }
+        .overview-value.green { color: var(--success); }
+        .overview-value.orange { color: var(--warning); }
+        .overview-value.blue { color: var(--accent); }
+        .overview-value.red { color: var(--danger); }
+
+        .class-list { max-height: 300px; overflow-y: auto; }
+        .class-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 11px 14px;
+            border-radius: var(--r-ctrl);
+            margin-bottom: 8px;
+            background: var(--surface-2);
+            border: 1px solid transparent;
+            transition: background-color 0.15s ease, border-color 0.15s ease;
+            gap: 10px;
+        }
+        .class-item:hover { background: var(--accent-soft); border-color: var(--accent-line); }
+        .class-name { font-size: 13.5px; font-weight: 550; color: var(--ink); }
+        .class-count {
+            font-size: 12px;
+            background: var(--accent);
+            color: #fff;
+            padding: 2px 9px;
+            border-radius: var(--r-pill);
+            font-variant-numeric: tabular-nums;
+            font-weight: 550;
+        }
+
+        /* 模板下载卡片 */
+        .template-download-card {
+            background: var(--surface);
+            border-radius: var(--r-card);
+            padding: 18px 22px;
+            margin-bottom: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px dashed var(--accent);
+            box-shadow: var(--shadow-1);
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .template-info { display: flex; align-items: center; gap: 16px; }
+        .template-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 12px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .template-icon .ico { width: 22px; height: 22px; }
+        .template-title { font-size: 15px; font-weight: 650; color: var(--ink); margin-bottom: 3px; }
+        .template-desc { font-size: 12.5px; color: var(--ink-2); }
+
+        /* 已选文件区域 */
+        .selected-file-box {
+            margin-top: 14px;
+            padding: 13px 16px;
+            background: var(--success-bg);
+            border: 1px solid var(--success-line);
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .selected-file-info { display: flex; align-items: center; gap: 9px; min-width: 0; }
+        .selected-file-info .ico { color: var(--success); width: 17px; height: 17px; flex-shrink: 0; }
+        .file-name {
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--ink);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 320px;
+        }
+        .file-size { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+        .selected-file-actions { display: flex; gap: 8px; }
+
+        /* ===== 自适应断点（流式网格 + 抽屉侧栏） ===== */
+
+        /* 中大屏：登录双栏略收窄，主区留白更均匀 */
+        @media (max-width: 1200px) {
+            .login-brand { padding: 40px 32px; }
+            .login-brand-copy h2 { font-size: clamp(28px, 3.5vw, 40px); }
+            table { min-width: 680px; }
+        }
+
+        @media (max-width: 1100px) {
+            .overview-grid { grid-template-columns: 1fr; }
+            .page-header p { max-width: min(40vw, 320px); }
+            .selected-file-box { flex-direction: column; align-items: stretch; }
+            .selected-file-actions { width: 100%; }
+            .selected-file-actions .btn { flex: 1; justify-content: center; }
+        }
+
+        /* 平板：侧栏抽屉 + 登录单栏 + 表单单栏 */
+        @media (max-width: 960px) {
+            .login-container { grid-template-columns: 1fr; }
+            .login-brand { display: none; }
+            .login-panel {
+                background:
+                    radial-gradient(ellipse 60% 40% at 50% 0%, var(--accent-soft), transparent 55%),
+                    var(--bg);
+                padding: clamp(24px, 4vw, 36px) clamp(16px, 3vw, 24px);
+                min-height: 100vh;
+            }
+            .login-box {
+                padding: clamp(28px, 4vw, 36px) clamp(20px, 3vw, 28px) 28px;
+                border-radius: 16px;
+                max-width: 440px;
+                margin: 0 auto;
+                width: 100%;
+            }
+            .login-header { flex-direction: column; text-align: center; gap: 12px; }
+            .login-footer {
+                padding: 14px 20px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .login-footer .footer-links { flex-wrap: wrap; row-gap: 8px; }
+            .login-footer .footer-links > * + * { padding-left: 14px; margin-left: 14px; }
+
+            .menu-toggle { display: inline-flex; }
+            .sidebar {
+                width: min(280px, 86vw);
+                transform: translateX(-105%);
+                transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+                box-shadow: none;
+                visibility: hidden;
+                pointer-events: none;
+            }
+            .admin-layout.nav-open .sidebar {
+                transform: translateX(0);
+                box-shadow: 12px 0 32px -12px rgba(16, 24, 40, 0.35);
+                visibility: visible;
+                pointer-events: auto;
+            }
+            .sidebar .brand-text,
+            .sidebar .nav-section-title { display: block; }
+            .sidebar .nav-item {
+                font-size: 13.5px;
+                gap: 10px;
+                justify-content: flex-start;
+                padding: 10px 12px;
+                min-height: 44px;
+            }
+            .sidebar .nav-badge { display: inline-flex; }
+            .main-content { margin-left: 0; }
+            .page-body { margin-inline: 0; }
+            .page-footer {
+                padding: 14px clamp(14px, 3vw, 20px);
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .welcome-banner { flex-direction: column; align-items: flex-start; }
+            .welcome-right { display: none; }
+            .welcome-greeting { font-size: clamp(18px, 4vw, 22px); }
+
+            .toolbar { align-items: stretch; }
+            .search-box { flex: 1 1 100%; max-width: none; width: 100%; }
+            .search-input { width: 100%; flex: 1 1 auto; }
+            .toolbar-group { width: 100%; }
+            .toolbar-group .btn { flex: 1 1 auto; min-width: 140px; justify-content: center; }
+
+            .template-download-card { flex-direction: column; align-items: stretch; }
+            .template-download-card .btn { width: 100%; justify-content: center; }
+
+            .modal-overlay { padding: 12px; align-items: flex-end; }
+            .modal {
+                max-height: min(90vh, 720px);
+                max-width: min(540px, 100%);
+                width: 100%;
+                border-radius: 16px 16px 12px 12px;
+            }
+            .modal-body { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+            .card { padding: clamp(14px, 2.5vw, 20px); }
+            .table-container { -webkit-overflow-scrolling: touch; max-width: 100%; }
+            table { min-width: 720px; }
+            .file-name { max-width: min(56vw, 240px); }
+            .page-header p { display: none; }
+            .info-banner { word-break: break-word; }
+            .info-banner strong { word-break: break-word; }
+        }
+
+        /* 手机：更紧凑排版 + 触控目标 */
+        @media (max-width: 640px) {
+            .admin-name { display: none; }
+            .page-header h2 { font-size: 16px; }
+            .card { padding: 14px; border-radius: 14px; }
+            .stat-card { padding: 16px; }
+            .stat-number { font-size: clamp(24px, 7vw, 30px); }
+            .action-card { min-height: 72px; padding: 16px 12px; }
+            .action-icon { width: 40px; height: 40px; }
+            .toolbar-group .btn { min-width: calc(50% - 4px); }
+            .info-banner { font-size: 13px; padding: 12px; line-height: 1.55; }
+            .upload-zone { padding: 28px 14px; }
+            .btn { min-height: 40px; }
+            .nav-item { min-height: 44px; }
+            .form-group { margin-bottom: 14px; }
+            .modal-header,
+            .modal-footer { padding: 14px 16px; }
+            .modal-footer { flex-wrap: wrap; }
+            .modal-footer .btn { flex: 1; min-width: 100px; justify-content: center; }
+            table { min-width: 640px; }
+            th, td { padding: 10px 10px; font-size: 13px; }
+        }
+
+        /* 超小屏 */
+        @media (max-width: 400px) {
+            .toolbar-group .btn { min-width: 100%; }
+            .login-box { padding: 24px 16px 20px; border-radius: 14px; }
+            .login-title { font-size: 20px; }
+            .brand-icon { width: 40px; height: 40px; }
+        }
+
+        /* 横屏手机：避免过高留白 */
+        @media (max-width: 960px) and (max-height: 500px) {
+            .login-box { padding-top: 20px; margin-top: 12px; }
+            .login-header { margin-bottom: 16px; }
+            .login-logo { width: 52px; height: 52px; }
+        }
+
+        @media (hover: none) {
+            .stat-card:hover,
+            .action-card:hover,
+            .class-item:hover {
+                transform: none;
+                box-shadow: var(--shadow-1);
+                border-color: var(--line);
+            }
+            .stat-card:hover { border-color: var(--line); }
+            .action-card:hover { border-color: var(--line); }
+            .btn:active,
+            .nav-item:active { transform: scale(0.98); }
+        }
+
+        /* 极窄侧栏占位：桌面下边距与 244px 同步，避免横向滚动 */
+        @media (min-width: 961px) {
+            .main-content { margin-left: 244px; }
+        }
+
+        /* 动效：taste 规范 — 入场 cubic-bezier(0.16, 1, 0.3, 1)，常规 150–300ms，焦点 500–800ms */
+        html.lenis, html.lenis body { height: auto; }
+        .lenis.lenis-smooth { scroll-behavior: auto !important; }
+        .lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
+        .lenis.lenis-stopped { overflow: hidden; }
+        .sidebar[data-lenis-prevent],
+        .modal-body[data-lenis-prevent],
+        .class-list[data-lenis-prevent] { overscroll-behavior: contain; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+        <symbol id="i-school" viewBox="0 0 24 24"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-5a3 3 0 0 1 6 0v5M9 11h.01M15 11h.01"/></symbol>
+        <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+        <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+        <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></symbol>
+        <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+        <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 14l2 2 4-4"/></symbol>
+        <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+        <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></symbol>
+        <symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2M17 6l3 3M14 9l2.5 2.5"/></symbol>
+        <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+        <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+        <symbol id="i-edit" viewBox="0 0 24 24"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+        <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+        <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+        <symbol id="i-building" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 21v-4h6v4M8 7h.01M12 7h.01M16 7h.01M8 11h.01M12 11h.01M16 11h.01"/></symbol>
+        <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></symbol>
+        <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+        <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></symbol>
+        <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
+        <symbol id="i-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></symbol>
+        <symbol id="i-x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></symbol>
+        <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3A7 7 0 0 0 12 2z"/></symbol>
+        <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></symbol>
+        <symbol id="i-clip" viewBox="0 0 24 24"><path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l8.57-8.57a4 4 0 1 1 5.66 5.66l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+        <symbol id="i-spinner" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.22-8.56"/></symbol>
+        <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+        <symbol id="i-pin" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+        <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    </defs>
+</svg>
+<!-- ==================== 登录页 ==================== -->
+<div id="loginPage" class="login-container">
+    <aside class="login-brand">
+        <div class="brand-mark">
+            <div class="mark-box"><img class="school-logo" src="school-emblem.png" alt="杭州职业技术大学校徽"></div>
+            <div>
+                <h1>杭州职业技术大学</h1>
+                <p>继续教育学院</p>
+            </div>
+        </div>
+        <div class="login-brand-copy">
+            <h2><span>进校系统</span><br>管理后台</h2>
+            <p>学员管理、入校审批与班级通知的一站式工作台。</p>
+            <div class="login-brand-pills">
+                <span class="login-pill"><svg class="ico"><use href="#i-users"/></svg>学员管理</span>
+                <span class="login-pill"><svg class="ico"><use href="#i-clipboard"/></svg>入校审批</span>
+                <span class="login-pill"><svg class="ico"><use href="#i-book"/></svg>班级通知</span>
+            </div>
+        </div>
+        <div class="login-brand-foot">
+            <svg class="ico"><use href="#i-phone"/></svg>
+            如需协助请联系：56700015
+        </div>
+    </aside>
+    <main class="login-panel">
+        <div class="login-box">
+            <div class="login-header">
+                <div class="login-logo"><img class="school-logo" src="school-emblem.png" alt="杭州职业技术大学校徽"></div>
+                <div class="login-header-copy">
+                    <div class="login-title">管理员登录</div>
+                    <div class="login-subtitle">请使用后台管理员账号进入系统</div>
+                </div>
+            </div>
+            <div class="login-form">
+                <div class="form-group">
+                    <label class="form-label" for="loginPhone">管理员账号</label>
+                    <input type="text" id="loginPhone" class="form-input" placeholder="请输入账号" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="loginPassword">密码</label>
+                    <input type="password" id="loginPassword" class="form-input" placeholder="请输入密码" autocomplete="current-password">
+                </div>
+                <div class="login-options">
+                    <label class="remember-me">
+                        <input type="checkbox" id="rememberPwd">
+                        <span>记住密码</span>
+                    </label>
+                    <span class="remember-hint">仅保存在本机浏览器</span>
+                </div>
+                <button class="btn btn-primary btn-block" onclick="doLogin()">登 录</button>
+            </div>
+            <div class="login-divider">安全访问</div>
+            <div class="login-help">仅限授权管理员使用 · 操作全程留痕</div>
+        </div>
+    </main>
+    <footer class="login-footer">
+        <div class="footer-brand">
+            <span class="footer-dot"></span>
+            <span>© 2026 杭州职业技术大学继续教育学院</span>
+        </div>
+        <div class="footer-links">
+            <a href="tel:56700015"><svg class="ico"><use href="#i-phone"/></svg>技术支持 56700015</a>
+            <span class="footer-version">进校管理系统 v1.0.0</span>
+        </div>
+    </footer>
+</div>
+
+<!-- ==================== 管理后台 ==================== -->
+<div id="adminPage" class="admin-layout hidden">
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
+    <div class="sidebar" id="sidebar" data-lenis-prevent>
+        <div class="sidebar-brand">
+            <div class="brand-icon"><img class="school-logo" src="school-emblem.png" alt="杭州职业技术大学校徽"></div>
+            <div class="brand-text">
+                <h3>管理后台</h3>
+                <p>继续教育学院</p>
+            </div>
+        </div>
+        <div class="nav-menu">
+            <div class="nav-section">
+                <div class="nav-section-title">概览</div>
+                <div class="nav-item active" onclick="switchPage('dashboard', this)">
+                    <span class="nav-icon"><svg class="ico"><use href="#i-grid"/></svg></span> 首页概览
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">学员管理</div>
+                <div class="nav-item" onclick="switchPage('students', this)">
+                    <span class="nav-icon"><svg class="ico"><use href="#i-users"/></svg></span> 学员列表
+                </div>
+                <div class="nav-item" onclick="switchPage('import', this)">
+                    <span class="nav-icon"><svg class="ico"><use href="#i-upload"/></svg></span> 批量导入
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">审批管理</div>
+                <div class="nav-item" onclick="switchPage('requests', this)">
+                    <span class="nav-icon"><svg class="ico"><use href="#i-clipboard"/></svg></span> 入校申请
+                    <span class="nav-badge hidden" id="pendingBadge">0</span>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">系统设置</div>
+                <div class="nav-item" onclick="switchPage('admin-manage', this)">
+                    <span class="nav-icon"><svg class="ico"><use href="#i-user"/></svg></span> 管理员管理
+                </div>
+                <div class="nav-item" onclick="switchPage('tips', this)">
+                    <span class="nav-icon"><svg class="ico"><use href="#i-bulb"/></svg></span> 温馨提示
+                </div>
+                <div class="nav-item" onclick="switchPage('accounts', this)">
+                    <span class="nav-icon"><svg class="ico"><use href="#i-key"/></svg></span> 账户管理
+                </div>
+            </div>
+        </div>
+        <div class="sidebar-footer">
+            <div class="nav-item" onclick="doLogout()">
+                <span class="nav-icon"><svg class="ico"><use href="#i-logout"/></svg></span> 退出登录
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="topbar">
+            <div class="topbar-left">
+                <button type="button" class="menu-toggle" id="menuToggle" aria-label="打开导航菜单" aria-expanded="false" onclick="toggleSidebar()">
+                    <svg class="ico"><use href="#i-menu"/></svg>
+                </button>
+                <div class="page-header">
+                    <h2 id="pageTitle">首页概览</h2>
+                    <p id="pageDesc">欢迎回来，管理员</p>
+                </div>
+            </div>
+            <div class="topbar-actions">
+                <div class="admin-name" id="adminNameDisplay">管理员</div>
+                <div class="admin-avatar" id="adminAvatar">管</div>
+            </div>
+        </div>
+
+        <div class="page-body">
+
+            <!-- ========== 首页概览 ========== -->
+            <div id="page-dashboard" class="page-content">
+                <div class="welcome-banner">
+                    <div class="welcome-left">
+                        <div class="welcome-greeting" id="welcomeGreeting">上午好</div>
+                        <div class="welcome-text">欢迎回到杭职大继续教育学院管理后台</div>
+                        <div class="welcome-date" id="welcomeDate"></div>
+                    </div>
+                    <div class="welcome-right">
+                        <div class="welcome-art"><img class="school-logo" src="school-logo.png" alt="杭州职业技术大学校徽"></div>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card" onclick="switchPage('students', document.querySelectorAll('.nav-item')[1])">
+                        <div class="stat-info">
+                            <div class="stat-label"><svg class="ico"><use href="#i-users"/></svg>学员总数</div>
+                            <div class="stat-number num" id="statStudents">0</div>
+                        </div>
+                        <div class="stat-arrow"><svg class="ico"><use href="#i-arrow-right"/></svg></div>
+                    </div>
+                    <div class="stat-card" data-tone="warning" onclick="switchPage('requests', document.querySelectorAll('.nav-item')[3])">
+                        <div class="stat-info">
+                            <div class="stat-label"><svg class="ico"><use href="#i-clock"/></svg>待审核申请</div>
+                            <div class="stat-number num" id="statPending">0</div>
+                        </div>
+                        <div class="stat-arrow"><svg class="ico"><use href="#i-arrow-right"/></svg></div>
+                    </div>
+                    <div class="stat-card" data-tone="success">
+                        <div class="stat-info">
+                            <div class="stat-label"><svg class="ico"><use href="#i-check-circle"/></svg>已通过申请</div>
+                            <div class="stat-number num" id="statApproved">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <div class="stat-label"><svg class="ico"><use href="#i-building"/></svg>班级数量</div>
+                            <div class="stat-number num" id="statClasses">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <div class="section-title-bar">
+                        <h3>快捷操作</h3>
+                    </div>
+                    <div class="action-grid">
+                        <div class="action-card" onclick="switchPage('students', document.querySelectorAll('.nav-item')[1]); setTimeout(showAddStudentModal, 300);">
+                            <div class="action-icon"><svg class="ico"><use href="#i-plus"/></svg></div>
+                            <div class="action-text">添加学员</div>
+                        </div>
+                        <div class="action-card" onclick="switchPage('import', document.querySelectorAll('.nav-item')[2])">
+                            <div class="action-icon"><svg class="ico"><use href="#i-upload"/></svg></div>
+                            <div class="action-text">批量导入</div>
+                        </div>
+                        <div class="action-card" onclick="switchPage('requests', document.querySelectorAll('.nav-item')[3])">
+                            <div class="action-icon"><svg class="ico"><use href="#i-clipboard"/></svg></div>
+                            <div class="action-text">审批申请</div>
+                        </div>
+                        <div class="action-card" onclick="window.open('/api/export/students')">
+                            <div class="action-icon"><svg class="ico"><use href="#i-download"/></svg></div>
+                            <div class="action-text">导出数据</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overview-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">数据概览</div>
+                        </div>
+                        <div class="overview-list">
+                            <div class="overview-item">
+                                <span class="overview-label">有效学员</span>
+                                <span class="overview-value green num" id="statActive">0</span>
+                            </div>
+                            <div class="overview-item">
+                                <span class="overview-label">已过期学员</span>
+                                <span class="overview-value orange num" id="statExpired">0</span>
+                            </div>
+                            <div class="overview-item">
+                                <span class="overview-label">今日新增学员</span>
+                                <span class="overview-value blue num" id="statTodayStudents">0</span>
+                            </div>
+                            <div class="overview-item">
+                                <span class="overview-label">今日新申请</span>
+                                <span class="overview-value blue num" id="statTodayRequests">0</span>
+                            </div>
+                            <div class="overview-item">
+                                <span class="overview-label">已拒绝申请</span>
+                                <span class="overview-value red num" id="statRejected">0</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">班级列表</div>
+                        </div>
+                        <div id="classListContainer" class="class-list" data-lenis-prevent>
+                            <div class="empty-hint" style="padding:20px;text-align:center;">暂无班级数据</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== 学员管理 ========== -->
+            <div id="page-students" class="page-content hidden">
+                <div class="card">
+                    <div class="toolbar">
+                        <div class="search-box">
+                            <input type="text" id="studentSearch" class="search-input" placeholder="搜索姓名、手机号、班级..." onkeyup="searchStudents()">
+                            <button class="btn btn-primary btn-sm" onclick="searchStudents()"><svg class="ico ico-sm"><use href="#i-search"/></svg>搜索</button>
+                        </div>
+                        <div class="toolbar-group">
+                            <button class="btn btn-primary btn-sm" onclick="showAddStudentModal()"><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加学员</button>
+                            <button class="btn btn-danger btn-sm" onclick="batchDeleteStudents()"><svg class="ico ico-sm"><use href="#i-trash"/></svg>批量删除</button>
+                            <a href="/api/export/students" class="btn btn-secondary btn-sm"><svg class="ico ico-sm"><use href="#i-download"/></svg>导出 Excel</a>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th width="40"><input type="checkbox" id="checkAll" onchange="toggleCheckAll()" aria-label="全选"></th>
+                                    <th>姓名</th>
+                                    <th>联系电话</th>
+                                    <th>身份证</th>
+                                    <th class="cell-wrap">公司</th>
+                                    <th class="cell-wrap">班级名称</th>
+                                    <th class="cell-wrap">上课时间</th>
+                                    <th class="cell-wrap">上课地点</th>
+                                    <th>课程开始</th>
+                                    <th>课程结束</th>
+                                    <th>截止时间</th>
+                                    <th width="140">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="studentTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== 批量导入 ========== -->
+            <div id="page-import" class="page-content hidden">
+                <div class="info-banner">
+                    <span class="banner-icon"><svg class="ico"><use href="#i-info"/></svg></span>
+                    <div>
+                        <strong>导入说明：</strong>支持自定义 Excel 模板，系统会自动识别常见表头名称。<br>
+                        必须包含字段：<strong>姓名、联系电话、班级名称、上课时间段、课程开始日期、课程结束日期、上课地点</strong><br>
+                        可选字段：<strong>身份证号码、公司名称</strong>（表头需包含“身份证”或“公司”关键词）<br>
+                        上课时间段支持逗号分隔多时间段，如：<strong>周三下午 14:00-16:00, 周五上午 9:00-11:00</strong><br>
+                        系统会根据上课时间段中的星期几和课程开始/结束日期自动生成每节课的具体日期。如手机号已存在，系统会自动更新该学员信息。
+                    </div>
+                </div>
+
+                <div class="template-download-card">
+                    <div class="template-info">
+                        <div class="template-icon"><svg class="ico"><use href="#i-file"/></svg></div>
+                        <div class="template-detail">
+                            <div class="template-title">Excel 导入模板</div>
+                            <div class="template-desc">包含标准表头和示例数据，下载后填写学员信息即可导入</div>
+                        </div>
+                    </div>
+                    <a href="/api/template/download" class="btn btn-primary">
+                        <svg class="ico ico-sm"><use href="#i-download"/></svg>下载模板
+                    </a>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">上传 Excel 文件</div>
+                    </div>
+                    <div class="upload-zone" id="uploadZone">
+                        <div class="upload-icon"><svg class="ico"><use href="#i-upload"/></svg></div>
+                        <div class="upload-text" id="uploadText">点击下方按钮或拖拽 Excel 文件到此处</div>
+                        <div class="upload-hint">支持 .xlsx、.xls 格式，单次最大支持 5000 条数据</div>
+                    </div>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none" onchange="handleFileSelect(event)">
+
+                    <div id="selectedFileBox" class="selected-file-box hidden">
+                        <div class="selected-file-info">
+                            <svg class="ico"><use href="#i-clip"/></svg>
+                            <span class="file-name" id="selectedFileName"></span>
+                            <span class="file-size" id="selectedFileSize"></span>
+                        </div>
+                        <div class="selected-file-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="clearSelectedFile()">重新选择</button>
+                            <button class="btn btn-primary btn-sm" id="confirmImportBtn" onclick="confirmImport()">确认导入</button>
+                        </div>
+                    </div>
+
+                    <div id="importResult"></div>
+                </div>
+            </div>
+
+            <!-- ========== 入校申请 ========== -->
+            <div id="page-requests" class="page-content hidden">
+                <div class="card">
+                    <div class="toolbar">
+                        <div class="search-box">
+                            <select id="requestFilter" class="search-input" onchange="loadRequests()" aria-label="按状态筛选">
+                                <option value="all">全部</option>
+                                <option value="pending">待审核</option>
+                                <option value="approved">已通过</option>
+                                <option value="rejected">已拒绝</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>姓名</th>
+                                    <th>联系电话</th>
+                                    <th>车牌号</th>
+                                    <th>进校日期</th>
+                                    <th class="cell-wrap">有效时段</th>
+                                    <th>申请时间</th>
+                                    <th>状态</th>
+                                    <th width="160">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="requestTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== 管理员管理 ========== -->
+            <div id="page-admin-manage" class="page-content hidden">
+                <div class="info-banner">
+                    <span class="banner-icon"><svg class="ico"><use href="#i-info"/></svg></span>
+                    <div>管理后台管理员账号。默认管理员（admin）不可删除。</div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">管理员列表</div>
+                        <div style="display:flex;gap:8px;">
+                            <button class="btn btn-secondary btn-sm" onclick="showAdminImportModal()"><svg class="ico ico-sm"><use href="#i-upload"/></svg>批量导入</button>
+                            <button class="btn btn-primary btn-sm" onclick="showAddAdminModal()"><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加管理员</button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>姓名</th>
+                                    <th>账号</th>
+                                    <th>角色</th>
+                                    <th class="cell-wrap">负责班级</th>
+                                    <th>创建时间</th>
+                                    <th width="160">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== 温馨提示 ========== -->
+            <div id="page-tips" class="page-content hidden">
+                <div class="info-banner">
+                    <span class="banner-icon"><svg class="ico"><use href="#i-info"/></svg></span>
+                    <div>为每个班级设置温馨提示，学员登录小程序后将在首页看到对应提示。</div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">温馨提示列表</div>
+                        <button class="btn btn-primary btn-sm" onclick="showAddTipModal()"><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加温馨提示</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>班级名称</th>
+                                    <th>温馨提示内容</th>
+                                    <th>更新时间</th>
+                                    <th width="160">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tipTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========== 学员账户 ========== -->
+            <div id="page-accounts" class="page-content hidden">
+                <div class="info-banner">
+                    <span class="banner-icon"><svg class="ico"><use href="#i-info"/></svg></span>
+                    <div>
+                        学员首次用手机号登录小程序时，系统会自动创建账户。密码默认为手机号后6位。
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">账户列表</div>
+                        <button class="btn btn-primary btn-sm" onclick="syncAccounts()"><svg class="ico ico-sm"><use href="#i-refresh"/></svg>从学员列表同步</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>姓名</th>
+                                    <th>手机号</th>
+                                    <th>密码</th>
+                                    <th>角色</th>
+                                    <th>创建时间</th>
+                                </tr>
+                            </thead>
+                            <tbody id="accountTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <footer class="page-footer">
+            <div class="footer-brand">
+                <span class="footer-dot"></span>
+                <span>© 2026 杭州职业技术大学继续教育学院 · 进校管理系统</span>
+            </div>
+            <div class="footer-links">
+                <a href="tel:56700015">技术支持 56700015</a>
+                <span>v1.0.0</span>
+            </div>
+        </footer>
+    </div>
+</div>
+
+<!-- ==================== 添加学员模态框 ==================== -->
+<div id="addStudentModal" class="modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-header">
+            <div class="modal-title" id="modalTitle">添加学员</div>
+            <button class="modal-close" onclick="closeModal()" aria-label="关闭"><svg class="ico"><use href="#i-x"/></svg></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="editStudentId">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">姓名 <span class="required">*</span></label>
+                    <input type="text" id="stuName" class="form-input" placeholder="请输入姓名">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">联系电话 <span class="required">*</span></label>
+                    <input type="text" id="stuPhone" class="form-input" placeholder="请输入11位手机号" maxlength="11">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">身份证号</label>
+                    <input type="text" id="stuIdCard" class="form-input" placeholder="用于设置初始密码（身份证后6位）" maxlength="18">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">公司/单位</label>
+                    <input type="text" id="stuCompany" class="form-input" placeholder="请输入所在公司或单位">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">班级名称 <span class="required">*</span></label>
+                <input type="text" id="stuClass" class="form-input" placeholder="如：计算机基础班">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">上课时间段 <span class="required">*</span></label>
+                    <input type="text" id="stuSchedule" class="form-input" placeholder="如：周一上午 9:00-11:00">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">上课地点 <span class="required">*</span></label>
+                    <input type="text" id="stuLocation" class="form-input" placeholder="如：教学楼301教室">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">课程开始日期 <span class="required">*</span></label>
+                    <input type="date" id="stuStartDate" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">课程结束日期 <span class="required">*</span></label>
+                    <input type="date" id="stuEndDate" class="form-input">
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">上课截止时间 <span class="required">*</span></label>
+                <input type="date" id="stuDeadline" class="form-input">
+            </div>
+            <div id="courseDatesPreview" style="display:none;margin-top:8px;padding:12px 14px;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:10px;font-size:13px;color:#10428f;line-height:1.7;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveStudent()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== 拒绝原因模态框 ==================== -->
+<div id="rejectModal" class="modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal-header">
+            <div class="modal-title">拒绝入校申请</div>
+            <button class="modal-close" onclick="closeRejectModal()" aria-label="关闭"><svg class="ico"><use href="#i-x"/></svg></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="rejectRequestId">
+            <div class="form-group">
+                <label class="form-label">拒绝原因（选填）</label>
+                <textarea id="rejectReason" class="form-textarea" placeholder="请输入拒绝原因，学员将在小程序中看到该说明..."></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeRejectModal()">取消</button>
+            <button class="btn btn-danger" onclick="confirmReject()">确认拒绝</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== 管理员模态框 ==================== -->
+<div id="adminModal" class="modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal-header">
+            <div class="modal-title" id="adminModalTitle">添加管理员</div>
+            <button class="modal-close" onclick="closeAdminModal()" aria-label="关闭"><svg class="ico"><use href="#i-x"/></svg></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="editAdminId">
+            <div class="form-group">
+                <label class="form-label">姓名 <span class="required">*</span></label>
+                <input type="text" id="adminName" class="form-input" placeholder="请输入姓名">
+            </div>
+            <div class="form-group">
+                <label class="form-label">账号 <span class="required">*</span></label>
+                <input type="text" id="adminPhone" class="form-input" placeholder="用于登录的账号">
+            </div>
+            <div class="form-group">
+                <label class="form-label">密码 <span id="pwdRequired" class="required">*</span></label>
+                <input type="password" id="adminPwd" class="form-input" placeholder="请输入密码">
+                <small id="pwdHint" class="form-hint" style="display:none;">留空则不修改密码</small>
+            </div>
+            <div class="form-group">
+                <label class="form-label">角色</label>
+                <select id="adminRole" class="form-select">
+                    <option value="admin">管理员</option>
+                    <option value="superadmin">超级管理员</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">负责班级</label>
+                <div id="adminClassesContainer" class="class-picker">
+                    <div class="empty-hint">加载中...</div>
+                </div>
+                <small class="form-hint">勾选该管理员负责的班级</small>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeAdminModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveAdmin()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== 温馨提示模态框 ==================== -->
+<div id="tipModal" class="modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal-header">
+            <div class="modal-title" id="tipModalTitle">编辑温馨提示</div>
+            <button class="modal-close" onclick="closeTipModal()" aria-label="关闭"><svg class="ico"><use href="#i-x"/></svg></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="editTipId">
+            <div class="form-group">
+                <label class="form-label">班级名称 <span class="required">*</span></label>
+                <select id="tipClassName" class="form-select">
+                    <option value="">请选择班级</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">温馨提示内容</label>
+                <textarea id="tipContent" class="form-textarea" rows="4" placeholder="请输入温馨提示内容..."></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeTipModal()">取消</button>
+            <button class="btn btn-primary" onclick="saveTip()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== 管理员导入模态框 ==================== -->
+<div id="adminImportModal" class="modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal-header">
+            <div class="modal-title">批量导入管理员</div>
+            <button class="modal-close" onclick="closeAdminImportModal()" aria-label="关闭"><svg class="ico"><use href="#i-x"/></svg></button>
+        </div>
+        <div class="modal-body">
+            <div class="info-banner" style="margin-bottom:16px;">
+                <span class="banner-icon"><svg class="ico"><use href="#i-info"/></svg></span>
+                <div>
+                    Excel 表头：<strong>姓名、账号、密码、角色、班级</strong><br>
+                    角色可选：admin（管理员）或 superadmin（超级管理员）<br>
+                    班级用逗号分隔，如：计算机基础班,会计实务班
+                </div>
+            </div>
+            <div class="upload-zone" id="adminUploadZone" style="padding:24px;">
+                <div class="upload-icon"><svg class="ico"><use href="#i-file"/></svg></div>
+                <div class="upload-text">点击选择 Excel 文件</div>
+            </div>
+            <input type="file" id="adminFileInput" accept=".xlsx,.xls" style="display:none" onchange="handleAdminFileSelect(event)">
+            <div id="adminImportResult" style="margin-top:12px;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeAdminImportModal()">关闭</button>
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.min.js"></script>
+<script>
+const API_BASE = 'http://localhost:3000/api';
+let allStudents = [];
+let pendingCount = 0;
+
+// ============ 动效基座（taste + GSAP + Lenis，标准同步与 cleanup） ============
+const Motion = (() => {
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let lenis = null;
+    let tickerCallback = null;
+    let ctx = null;
+
+    function register() {
+        if (typeof gsap === 'undefined') return false;
+        if (typeof ScrollTrigger !== 'undefined') gsap.registerPlugin(ScrollTrigger);
+        return true;
+    }
+
+    function initScroll() {
+        if (reduce || !register() || typeof Lenis === 'undefined' || lenis) return;
+        lenis = new Lenis({ duration: 1.1, smoothWheel: true, syncTouch: false });
+        if (typeof ScrollTrigger !== 'undefined') {
+            lenis.on('scroll', ScrollTrigger.update);
+            tickerCallback = (time) => { if (lenis) lenis.raf(time * 1000); };
+            gsap.ticker.add(tickerCallback);
+            gsap.ticker.lagSmoothing(0);
+            ScrollTrigger.refresh();
+        }
+    }
+
+    function destroy() {
+        if (tickerCallback) { gsap.ticker.remove(tickerCallback); tickerCallback = null; }
+        if (lenis) { lenis.destroy(); lenis = null; }
+        if (ctx) { ctx.revert(); ctx = null; }
+        if (typeof ScrollTrigger !== 'undefined') ScrollTrigger.getAll().forEach(t => t.kill());
+    }
+
+    function loginEntrance() {
+        if (reduce || !register()) return;
+        const root = document.getElementById('loginPage');
+        if (!root || root.classList.contains('hidden')) return;
+        if (ctx) ctx.revert();
+        ctx = gsap.context(() => {
+            const tl = gsap.timeline({ defaults: { ease: 'expo.out' } });
+            tl.from('.login-brand .brand-mark', { y: 16, autoAlpha: 0, duration: 0.5 })
+              .from('.login-brand-copy h2, .login-brand-copy p', { y: 14, autoAlpha: 0, duration: 0.5, stagger: 0.06 }, '-=0.32')
+              .from('.login-pill', { y: 10, autoAlpha: 0, duration: 0.4, stagger: 0.05 }, '-=0.28')
+              .from('.login-brand-foot', { autoAlpha: 0, duration: 0.35, ease: 'power2.out' }, '-=0.2')
+              .from('.login-box', { y: 20, autoAlpha: 0, duration: 0.55 }, '-=0.5')
+              .from('.login-footer', { autoAlpha: 0, duration: 0.4, ease: 'power2.out' }, '-=0.25');
+        }, root);
+    }
+
+    function adminEntrance() {
+        if (reduce || !register()) return;
+        const root = document.getElementById('adminPage');
+        if (!root || root.classList.contains('hidden')) return;
+        if (ctx) ctx.revert();
+        ctx = gsap.context(() => {
+            const tl = gsap.timeline({ defaults: { ease: 'expo.out' } });
+            tl.from('.sidebar-brand', { x: -12, autoAlpha: 0, duration: 0.4 })
+              .from('.nav-menu .nav-item', { x: -10, autoAlpha: 0, duration: 0.35, stagger: 0.04 }, '-=0.2')
+              .from('.sidebar-footer .nav-item', { autoAlpha: 0, duration: 0.3, ease: 'power2.out' }, '-=0.15')
+              .from('.topbar', { y: -8, autoAlpha: 0, duration: 0.4 }, '-=0.3')
+              .from('#page-dashboard .welcome-banner, #page-dashboard .stat-card, #page-dashboard .section-title-bar, #page-dashboard .action-card, #page-dashboard .overview-grid > .card',
+                    { y: 14, autoAlpha: 0, duration: 0.45, stagger: 0.05 }, '-=0.2');
+        }, root);
+        if (typeof ScrollTrigger !== 'undefined') ScrollTrigger.refresh();
+    }
+
+    function pageEntrance(pageId) {
+        if (reduce || !register()) return;
+        const el = document.getElementById('page-' + pageId);
+        if (!el || el.classList.contains('hidden')) return;
+        const targets = el.querySelectorAll('.card, .info-banner, .template-download-card, .stats-grid > .stat-card, .action-grid > .action-card');
+        if (!targets.length) return;
+        gsap.fromTo(targets,
+            { y: 10, autoAlpha: 0 },
+            { y: 0, autoAlpha: 1, duration: 0.4, stagger: 0.05, ease: 'expo.out', overwrite: 'auto' }
+        );
+        if (typeof ScrollTrigger !== 'undefined') ScrollTrigger.refresh();
+    }
+
+    function toastIn(el) {
+        if (reduce || !register()) return;
+        gsap.fromTo(el, { x: 24, autoAlpha: 0 }, { x: 0, autoAlpha: 1, duration: 0.28, ease: 'expo.out', overwrite: 'auto' });
+    }
+
+    return { reduce, initScroll, destroy, loginEntrance, adminEntrance, pageEntrance, toastIn };
+})();
+
+const pageConfig = {
+    dashboard: { title: '首页概览', desc: '欢迎回来，管理员' },
+    students: { title: '学员管理', desc: '管理所有学员的课程信息' },
+    import: { title: '批量导入', desc: '从 Excel 文件批量导入学员数据' },
+    requests: { title: '入校申请', desc: '审批学员的入校咨询申请' },
+    'admin-manage': { title: '管理员管理', desc: '管理后台管理员账号' },
+    tips: { title: '温馨提示', desc: '为班级设置温馨提示' },
+    accounts: { title: '账户管理', desc: '查看和管理学员登录账户' }
+};
+
+function ico(id, cls) {
+    return '<svg class="ico ' + (cls || '') + '"><use href="#' + id + '"/></svg>';
+}
+
+function skeletonRows(cols, rows) {
+    let html = '';
+    for (let r = 0; r < rows; r++) {
+        html += '<tr>';
+        for (let c = 0; c < cols; c++) {
+            html += '<td><span class="skeleton-cell" style="width:' + (c === 0 ? 46 : 70 + ((c * 13 + r * 7) % 40)) + 'px"></span></td>';
+        }
+        html += '</tr>';
+    }
+    return html;
+}
+
+function emptyCell(cols, iconId, text, hint) {
+    return '<tr><td colspan="' + cols + '"><div class="empty-state">' +
+        '<div class="empty-icon">' + ico(iconId) + '</div>' +
+        '<div class="empty-text">' + text + '</div>' +
+        (hint ? '<div class="empty-hint">' + hint + '</div>' : '') +
+        '</div></td></tr>';
+}
+
+// ============ 登录 ============
+let currentAdminRole = '';
+
+function getSession() {
+    try { return JSON.parse(localStorage.getItem('adminLogin') || 'null'); } catch (e) { return null; }
+}
+function clearSession() { localStorage.removeItem('adminLogin'); }
+
+function getRemembered() {
+    try { return JSON.parse(localStorage.getItem('adminRemember') || 'null'); } catch (e) { return null; }
+}
+function applyRemembered() {
+    const remembered = getRemembered();
+    const rememberEl = document.getElementById('rememberPwd');
+    if (remembered && remembered.phone) {
+        document.getElementById('loginPhone').value = remembered.phone || '';
+        if (remembered.password) document.getElementById('loginPassword').value = remembered.password;
+        if (rememberEl) rememberEl.checked = true;
+    }
+}
+function saveRemembered(phone, password) {
+    localStorage.setItem('adminRemember', JSON.stringify({ phone, password }));
+}
+function clearRemembered() { localStorage.removeItem('adminRemember'); }
+
+function apiFetch(url, options = {}) {
+    const headers = { ...(options.headers || {}) };
+    const session = getSession();
+    if (session && session.token) headers['Authorization'] = 'Bearer ' + session.token;
+    return fetch(url, { ...options, headers }).then(r => {
+        if (r.status === 401) {
+            clearSession();
+            closeSidebar();
+            document.getElementById('adminPage').classList.add('hidden');
+            document.getElementById('loginPage').classList.remove('hidden');
+            showToast('登录已过期，请重新登录', 'error');
+        }
+        return r;
+    });
+}
+
+function enterAdmin(data) {
+    currentAdminRole = data.role || 'admin';
+    closeSidebar();
+    document.getElementById('loginPage').classList.add('hidden');
+    document.getElementById('adminPage').classList.remove('hidden');
+    document.getElementById('adminAvatar').textContent = (data.name || '管').charAt(0);
+    document.getElementById('adminNameDisplay').textContent = data.name || '管理员';
+    applyRolePermission();
+    loadDashboard();
+    requestAnimationFrame(() => Motion.adminEntrance());
+}
+
+function doLogin() {
+    const phone = document.getElementById('loginPhone').value.trim();
+    const password = document.getElementById('loginPassword').value.trim();
+    if (!phone || !password) return showToast('请输入账号和密码', 'error');
+
+    const rememberEl = document.getElementById('rememberPwd');
+    const isRemember = rememberEl ? rememberEl.checked : false;
+
+    const btn = document.querySelector('#loginPage .btn-primary');
+    const btnHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '登录中...'; }
+
+    apiFetch(`${API_BASE}/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, password })
+    }).then(r => r.json()).then(res => {
+        if (btn) { btn.disabled = false; btn.innerHTML = btnHtml; }
+        if (res.success && res.data && res.data.token) {
+            if (isRemember) saveRemembered(phone, password);
+            else clearRemembered();
+            localStorage.setItem('adminLogin', JSON.stringify({
+                token: res.data.token,
+                phone: res.data.phone,
+                name: res.data.name,
+                role: res.data.role || 'admin',
+                exp: Date.now() + 7 * 24 * 60 * 60 * 1000
+            }));
+            document.getElementById('loginPassword').value = '';
+            enterAdmin(res.data);
+        } else {
+            showToast(res.message || '登录失败', 'error');
+        }
+    }).catch(err => {
+        if (btn) { btn.disabled = false; btn.innerHTML = btnHtml; }
+        showToast('登录失败：' + err.message, 'error');
+    });
+}
+
+function applyRolePermission() {
+    document.querySelectorAll('.nav-item').forEach(el => {
+        if (el.textContent.includes('管理员管理')) {
+            el.style.display = currentAdminRole === 'superadmin' ? '' : 'none';
+        }
+    });
+}
+
+function doLogout() {
+    clearSession();
+    closeSidebar();
+    document.getElementById('adminPage').classList.add('hidden');
+    document.getElementById('loginPage').classList.remove('hidden');
+    document.getElementById('loginPassword').value = '';
+    currentAdminRole = '';
+    applyRemembered();
+    requestAnimationFrame(() => Motion.loginEntrance());
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    Motion.initScroll();
+    applyRemembered();
+    Motion.loginEntrance();
+
+    const session = getSession();
+    if (!session || !session.token) { clearSession(); return; }
+    if (session.exp && session.exp < Date.now()) { clearSession(); return; }
+
+    apiFetch(`${API_BASE}/admin/me`, {
+        headers: { 'Authorization': 'Bearer ' + session.token }
+    }).then(r => r.status === 401 ? { success: false } : r.json()).then(res => {
+        if (res.success && res.data) {
+            localStorage.setItem('adminLogin', JSON.stringify({
+                ...session,
+                name: res.data.name,
+                phone: res.data.phone,
+                role: res.data.role || 'admin'
+            }));
+            enterAdmin(res.data);
+        } else {
+            clearSession();
+            applyRemembered();
+        }
+    }).catch(() => { /* 网络错误时保留本地会话，待服务恢复 */ });
+});
+
+// ============ 页面切换 ============
+function switchPage(page, navEl) {
+    document.querySelectorAll('.page-content').forEach(el => el.classList.add('hidden'));
+    document.getElementById(`page-${page}`).classList.remove('hidden');
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    if (navEl) navEl.classList.add('active');
+    closeSidebar();
+
+    const config = pageConfig[page];
+    document.getElementById('pageTitle').textContent = config.title;
+    document.getElementById('pageDesc').textContent = config.desc;
+
+    if (page === 'dashboard') {
+        apiFetch(`${API_BASE}/students`).then(r => r.json()).then(res => {
+            if (res.success) allStudents = res.data;
+            loadDashboard();
+        });
+    }
+    if (page === 'students') loadStudents();
+    if (page === 'requests') loadRequests();
+    if (page === 'admin-manage') loadAdmins();
+    if (page === 'tips') loadTips();
+    if (page === 'accounts') loadAccounts();
+    requestAnimationFrame(() => Motion.pageEntrance(page));
+}
+
+// ============ 仪表盘 ============
+function loadDashboard() {
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? '上午好' : hour < 18 ? '下午好' : '晚上好';
+    document.getElementById('welcomeGreeting').textContent = greeting + '，管理员';
+    const now = new Date();
+    const days = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+    document.getElementById('welcomeDate').textContent = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 ${days[now.getDay()]}`;
+
+    apiFetch(`${API_BASE}/stats/detail`).then(r => r.json()).then(res => {
+        if (res.success) {
+            const d = res.data;
+            document.getElementById('statStudents').textContent = d.studentCount;
+            document.getElementById('statPending').textContent = d.pendingRequestCount;
+            document.getElementById('statApproved').textContent = d.approvedCount;
+            document.getElementById('statClasses').textContent = d.classCount;
+            document.getElementById('statActive').textContent = d.activeStudents;
+            document.getElementById('statExpired').textContent = d.expiredStudents;
+            document.getElementById('statTodayStudents').textContent = d.todayStudents;
+            document.getElementById('statTodayRequests').textContent = d.todayRequests;
+            document.getElementById('statRejected').textContent = d.rejectedCount;
+            pendingCount = d.pendingRequestCount;
+            updatePendingBadge();
+
+            const classContainer = document.getElementById('classListContainer');
+            if (d.classNames && d.classNames.length > 0) {
+                const studentCounts = {};
+                d.classNames.forEach(name => {
+                    studentCounts[name] = allStudents.filter(s => s.className === name).length;
+                });
+                classContainer.innerHTML = d.classNames.map(name => `
+                    <div class="class-item">
+                        <span class="class-name">${name}</span>
+                        <span class="class-count num">${studentCounts[name] || 0} 人</span>
+                    </div>
+                `).join('');
+            } else {
+                classContainer.innerHTML = '<div class="empty-hint" style="padding:20px;text-align:center;">暂无班级数据</div>';
+            }
+        }
+    });
+}
+
+function updatePendingBadge() {
+    const badge = document.getElementById('pendingBadge');
+    if (pendingCount > 0) {
+        badge.textContent = pendingCount;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+// ============ 学员管理 ============
+function loadStudents() {
+    const tbody = document.getElementById('studentTableBody');
+    tbody.innerHTML = skeletonRows(12, 8);
+    apiFetch(`${API_BASE}/students`).then(r => r.json()).then(res => {
+        if (res.success) { allStudents = res.data; renderStudents(allStudents); }
+    }).catch(() => { tbody.innerHTML = emptyCell(12, 'i-alert', '加载失败', '请检查网络后重试'); });
+}
+
+function renderStudents(students) {
+    const tbody = document.getElementById('studentTableBody');
+    if (students.length === 0) {
+        tbody.innerHTML = emptyCell(12, 'i-inbox', '暂无学员数据', '点击右上角「添加学员」或「批量导入」');
+        return;
+    }
+    tbody.innerHTML = students.map(s => {
+        const courseDatesCount = (s.courseDates && s.courseDates.length > 0) ? s.courseDates.length : 0;
+        return `<tr>
+            <td><input type="checkbox" class="stu-check" value="${s._id}" aria-label="选择 ${s.name}"></td>
+            <td><strong>${s.name}</strong></td>
+            <td class="num">${s.phone}</td>
+            <td class="num">${s.idCard || '-'}</td>
+            <td class="cell-wrap">${s.company || '-'}</td>
+            <td class="cell-wrap">${s.className}</td>
+            <td class="cell-wrap">${s.schedule}</td>
+            <td class="cell-wrap">${s.location}</td>
+            <td class="num">${s.courseStartDate || '-'}</td>
+            <td class="num">${s.courseEndDate || '-'}</td>
+            <td class="num">${s.deadline || '-'}${courseDatesCount > 0 ? '<br><small style="color:var(--accent)">' + courseDatesCount + '节课</small>' : ''}</td>
+            <td>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="editStudent('${s._id}')" title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="resetPassword('${s._id}','${s.name}')" title="重置密码" aria-label="重置密码">${ico('i-key','ico-sm')}</button>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="deleteStudent('${s._id}','${s.name}')" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function searchStudents() {
+    const key = document.getElementById('studentSearch').value.trim().toLowerCase();
+    if (!key) { renderStudents(allStudents); return; }
+    renderStudents(allStudents.filter(s => s.name.toLowerCase().includes(key) || s.phone.includes(key) || (s.className && s.className.toLowerCase().includes(key)) || (s.idCard && s.idCard.includes(key)) || (s.company && s.company.toLowerCase().includes(key))));
+}
+
+function toggleCheckAll() {
+    const checked = document.getElementById('checkAll').checked;
+    document.querySelectorAll('.stu-check').forEach(cb => cb.checked = checked);
+}
+
+function showAddStudentModal() {
+    document.getElementById('modalTitle').textContent = '添加学员';
+    ['editStudentId','stuName','stuPhone','stuIdCard','stuCompany','stuClass','stuSchedule','stuStartDate','stuEndDate','stuDeadline','stuLocation'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+    const preview = document.getElementById('courseDatesPreview');
+    if(preview) preview.style.display = 'none';
+    document.getElementById('addStudentModal').classList.add('show');
+}
+
+function editStudent(id) {
+    const s = allStudents.find(x => x._id === id);
+    if (!s) return;
+    document.getElementById('modalTitle').textContent = '编辑学员';
+    document.getElementById('editStudentId').value = id;
+    document.getElementById('stuName').value = s.name;
+    document.getElementById('stuPhone').value = s.phone;
+    document.getElementById('stuClass').value = s.className;
+    document.getElementById('stuSchedule').value = s.schedule;
+    document.getElementById('stuStartDate').value = s.courseStartDate || '';
+    document.getElementById('stuEndDate').value = s.courseEndDate || '';
+    document.getElementById('stuDeadline').value = s.deadline;
+    document.getElementById('stuLocation').value = s.location;
+    document.getElementById('stuIdCard').value = s.idCard || '';
+    document.getElementById('stuCompany').value = s.company || '';
+    previewCourseDates();
+    document.getElementById('addStudentModal').classList.add('show');
+}
+
+function closeModal() { document.getElementById('addStudentModal').classList.remove('show'); }
+
+function previewCourseDates() {
+    const schedule = document.getElementById('stuSchedule').value;
+    const startDate = document.getElementById('stuStartDate').value;
+    const endDate = document.getElementById('stuEndDate').value;
+    const preview = document.getElementById('courseDatesPreview');
+    if (!preview) return;
+    if (!schedule || !startDate || !endDate) { preview.style.display = 'none'; return; }
+    const dates = generateCourseDatesJS(schedule, startDate, endDate);
+    if (dates.length === 0) { preview.style.display = 'none'; return; }
+    preview.style.display = 'block';
+    preview.innerHTML = '<strong>自动排课预览（共' + dates.length + '节）</strong><br>' +
+        dates.slice(0, 10).map(d => d.date + ' ' + d.timeSlot).join('<br>') +
+        (dates.length > 10 ? '<br>... 等共 ' + dates.length + ' 节' : '');
+}
+
+function generateCourseDatesJS(schedule, startDate, endDate) {
+    const dayMap = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '日': 0 };
+    let targetDay = -1;
+    for (const [key, val] of Object.entries(dayMap)) {
+        if (schedule.includes(key)) { targetDay = val; break; }
+    }
+    if (targetDay < 0) return [];
+    const timeMatch = schedule.match(/(\d{1,2}:\d{2})\s*[-~]\s*(\d{1,2}:\d{2})/);
+    const timeSlot = timeMatch ? timeMatch[0] : schedule;
+    const dates = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const d = new Date(start);
+    while (d.getDay() !== targetDay && d <= end) d.setDate(d.getDate() + 1);
+    while (d <= end) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        dates.push({ date: y + '-' + m + '-' + day, timeSlot });
+        d.setDate(d.getDate() + 7);
+    }
+    return dates;
+}
+
+function saveStudent() {
+    const editId = document.getElementById('editStudentId').value;
+    const schedule = document.getElementById('stuSchedule').value.trim();
+    const courseStartDate = document.getElementById('stuStartDate').value;
+    const courseEndDate = document.getElementById('stuEndDate').value;
+    const deadline = document.getElementById('stuDeadline').value || courseEndDate;
+    const data = {
+        name: document.getElementById('stuName').value.trim(),
+        phone: document.getElementById('stuPhone').value.trim(),
+        className: document.getElementById('stuClass').value.trim(),
+        schedule: schedule,
+        courseStartDate: courseStartDate,
+        courseEndDate: courseEndDate,
+        deadline: deadline,
+        location: document.getElementById('stuLocation').value.trim(),
+        idCard: document.getElementById('stuIdCard').value.trim(),
+        company: document.getElementById('stuCompany').value.trim(),
+        courseDates: generateCourseDatesJS(schedule, courseStartDate, courseEndDate)
+    };
+    if (!data.name || !data.phone || !data.className || !data.schedule || !data.courseStartDate || !data.courseEndDate || !data.location) {
+        return showToast('请填写所有必填字段', 'error');
+    }
+    if (courseStartDate && courseEndDate && courseStartDate > courseEndDate) {
+        return showToast('课程结束日期必须大于等于课程开始日期', 'error');
+    }
+    if (deadline && courseEndDate && deadline < courseEndDate) {
+        return showToast('上课截止时间必须大于等于课程结束日期', 'error');
+    }
+    if (editId) {
+        apiFetch(`${API_BASE}/students/${editId}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+        }).then(r => r.json()).then(res => {
+            if (res.success) { showToast(res.message); closeModal(); loadStudents(); }
+            else showToast(res.message, 'error');
+        });
+    } else {
+        apiFetch(`${API_BASE}/students`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+        }).then(r => r.json()).then(res => {
+            if (res.success) { showToast(res.message); closeModal(); loadStudents(); }
+            else showToast(res.message, 'error');
+        });
+    }
+}
+
+function resetPassword(id, name) {
+    if (!confirm(`确定要重置学员「${name}」的密码吗？\n重置后密码为身份证后6位，登录后需重新修改密码。`)) return;
+    apiFetch(`${API_BASE}/students/${id}/reset-password`, { method: 'POST' }).then(r => r.json()).then(res => {
+        if (res.success) {
+            showToast('密码已重置为：' + res.newPassword);
+        } else {
+            showToast(res.message, 'error');
+        }
+    });
+}
+
+function deleteStudent(id, name) {
+    if (!confirm(`确定要删除学员「${name}」吗？此操作不可恢复。`)) return;
+    apiFetch(`${API_BASE}/students/${id}`, { method: 'DELETE' }).then(r => r.json()).then(res => {
+        if (res.success) { showToast('删除成功'); loadStudents(); } else showToast(res.message, 'error');
+    });
+}
+
+function batchDeleteStudents() {
+    const ids = [...document.querySelectorAll('.stu-check:checked')].map(cb => cb.value);
+    if (ids.length === 0) return showToast('请先勾选要删除的学员', 'error');
+    if (!confirm(`确定要删除选中的 ${ids.length} 名学员吗？`)) return;
+    apiFetch(`${API_BASE}/students/batch-delete`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids })
+    }).then(r => r.json()).then(res => {
+        if (res.success) { showToast(res.message); loadStudents(); } else showToast(res.message, 'error');
+    });
+}
+
+// ============ Excel 导入 ============
+let selectedFile = null;
+
+const uploadZone = document.getElementById('uploadZone');
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) handleFileSelected(e.dataTransfer.files[0]);
+});
+uploadZone.addEventListener('click', () => document.getElementById('fileInput').click());
+
+function handleFileSelect(e) { if (e.target.files.length) handleFileSelected(e.target.files[0]); }
+
+function handleFileSelected(file) {
+    if (!file.name.match(/\.xlsx?$/i)) return showToast('请选择 Excel 文件（.xlsx 或 .xls）', 'error');
+    selectedFile = file;
+    document.getElementById('selectedFileName').textContent = file.name;
+    document.getElementById('selectedFileSize').textContent = '(' + (file.size / 1024).toFixed(1) + ' KB)';
+    document.getElementById('selectedFileBox').classList.remove('hidden');
+    document.getElementById('importResult').innerHTML = '';
+}
+
+function clearSelectedFile() {
+    selectedFile = null;
+    document.getElementById('selectedFileBox').classList.add('hidden');
+    document.getElementById('fileInput').value = '';
+}
+
+function confirmImport() {
+    if (!selectedFile) return showToast('请先选择文件', 'error');
+    const btn = document.getElementById('confirmImportBtn');
+    btn.disabled = true;
+    btn.textContent = '导入中...';
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    document.getElementById('importResult').innerHTML = '<div class="result-box result-info"><span class="result-icon">' + ico('i-clock') + '</span><div>正在导入中，请稍候...</div></div>';
+
+    apiFetch(`${API_BASE}/import`, { method: 'POST', body: formData }).then(r => r.json()).then(res => {
+        btn.disabled = false;
+        btn.textContent = '确认导入';
+        if (res.success) {
+            const d = res.data;
+            let html = `<div class="result-box result-success">
+                <span class="result-icon">${ico('i-check-circle')}</span>
+                <div><strong>导入完成</strong>：共 ${d.total} 条，新增 ${d.added} 条，更新 ${d.updated} 条，失败 ${d.failed} 条</div>
+            </div>`;
+            if (d.errors.length > 0) {
+                html += '<div class="error-list">' + d.errors.map(e => `<div class="error-item">${ico('i-alert','ico-sm')} ${e}</div>`).join('') + '</div>';
+            }
+            document.getElementById('importResult').innerHTML = html;
+            loadStudents();
+            selectedFile = null;
+            document.getElementById('selectedFileBox').classList.add('hidden');
+            document.getElementById('fileInput').value = '';
+        } else {
+            document.getElementById('importResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>${res.message}</div></div>`;
+        }
+    }).catch(err => {
+        btn.disabled = false;
+        btn.textContent = '确认导入';
+        document.getElementById('importResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>导入失败：${err.message}</div></div>`;
+    });
+}
+
+// ============ 入校申请 ============
+function loadRequests() {
+    const tbody = document.getElementById('requestTableBody');
+    tbody.innerHTML = skeletonRows(8, 6);
+    const status = document.getElementById('requestFilter').value;
+    apiFetch(`${API_BASE}/requests?status=${status}`).then(r => r.json()).then(res => {
+        if (res.success) renderRequests(res.data);
+    }).catch(() => { tbody.innerHTML = emptyCell(8, 'i-alert', '加载失败', '请检查网络后重试'); });
+}
+
+function renderRequests(requests) {
+    const tbody = document.getElementById('requestTableBody');
+    if (requests.length === 0) {
+        tbody.innerHTML = emptyCell(8, 'i-inbox', '暂无申请数据');
+        return;
+    }
+    const now = new Date();
+    const statusMap = { pending: ['待审核', 'tag-pending'], approved: ['已通过', 'tag-approved'], rejected: ['已拒绝', 'tag-rejected'] };
+    tbody.innerHTML = requests.map(r => {
+        const isExpired = r.status === 'approved' && r.entryEndTime && now > new Date(r.entryEndTime);
+        let statusText, statusClass;
+        if (isExpired) { statusText = '已过期'; statusClass = 'tag-expired'; }
+        else { [statusText, statusClass] = statusMap[r.status] || ['未知', '']; }
+        const time = r.createdAt ? new Date(r.createdAt).toLocaleString('zh-CN') : '-';
+        const entryDate = r.entryDate || '-';
+        const timeSlot = r.entryStartTime ? `${r.entryStartTime} - ${r.entryEndTime}` : '-';
+        return `<tr>
+            <td><strong>${r.name}</strong></td>
+            <td class="num">${r.phone}</td>
+            <td class="num">${r.carPlate || '-'}</td>
+            <td class="num">${entryDate}</td>
+            <td class="num cell-wrap">${timeSlot}</td>
+            <td class="num">${time}</td>
+            <td><span class="tag ${statusClass}"><span class="tag-dot"></span>${statusText}</span></td>
+            <td>
+                ${r.status === 'pending' ? `
+                    <button class="btn btn-success btn-sm" onclick="approveRequest('${r._id}')">${ico('i-check','ico-sm')}通过</button>
+                    <button class="btn btn-danger btn-sm" onclick="showRejectModal('${r._id}')">${ico('i-x','ico-sm')}拒绝</button>
+                ` : r.status === 'approved' ? '<span class="tag tag-approved"><span class="tag-dot"></span>已通过</span>' : r.status === 'rejected' ? '<span class="tag tag-rejected"><span class="tag-dot"></span>已拒绝</span>' : '<span style="color:var(--ink-3)">-</span>'}
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function approveRequest(id) {
+    apiFetch(`${API_BASE}/requests/${id}/approve`, { method: 'POST' }).then(r => r.json()).then(res => {
+        if (res.success) { showToast('已通过'); loadRequests(); loadDashboard(); }
+    });
+}
+
+function showRejectModal(id) {
+    document.getElementById('rejectRequestId').value = id;
+    document.getElementById('rejectReason').value = '';
+    document.getElementById('rejectModal').classList.add('show');
+}
+function closeRejectModal() { document.getElementById('rejectModal').classList.remove('show'); }
+function confirmReject() {
+    const id = document.getElementById('rejectRequestId').value;
+    const reason = document.getElementById('rejectReason').value.trim();
+    apiFetch(`${API_BASE}/requests/${id}/reject`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason })
+    }).then(r => r.json()).then(res => {
+        if (res.success) { showToast('已拒绝'); closeRejectModal(); loadRequests(); loadDashboard(); }
+    });
+}
+
+// ============ 账户管理 ============
+function loadAccounts() {
+    const tbody = document.getElementById('accountTableBody');
+    tbody.innerHTML = skeletonRows(5, 6);
+    apiFetch(`${API_BASE}/accounts`).then(r => r.json()).then(res => {
+        if (res.success) renderAccounts(res.data);
+    }).catch(() => { tbody.innerHTML = emptyCell(5, 'i-alert', '加载失败'); });
+}
+
+function renderAccounts(accounts) {
+    const tbody = document.getElementById('accountTableBody');
+    if (accounts.length === 0) {
+        tbody.innerHTML = emptyCell(5, 'i-key', '暂无账户数据', '点击「从学员列表同步」生成账户');
+        return;
+    }
+    tbody.innerHTML = accounts.map(a => {
+        const time = a.createdAt ? new Date(a.createdAt).toLocaleString('zh-CN') : '-';
+        return `<tr>
+            <td><strong>${a.name || '-'}</strong></td>
+            <td class="num">${a.phone}</td>
+            <td><code style="background:var(--neutral-bg);padding:2px 6px;border-radius:6px;font-size:13px;">${a.password || '-'}</code></td>
+            <td><span class="tag ${a.role === 'admin' ? 'tag-approved' : 'tag-pending'}"><span class="tag-dot"></span>${a.role === 'admin' ? '管理员' : '学员'}</span></td>
+            <td class="num">${time}</td>
+        </tr>`;
+    }).join('');
+}
+
+function syncAccounts() {
+    apiFetch(`${API_BASE}/accounts/sync`, { method: 'POST' }).then(r => r.json()).then(res => {
+        if (res.success) { showToast(res.message); loadAccounts(); } else showToast(res.message, 'error');
+    });
+}
+
+// ============ 管理员管理 ============
+function loadAdmins() {
+    const tbody = document.getElementById('adminTableBody');
+    tbody.innerHTML = skeletonRows(6, 5);
+    apiFetch(`${API_BASE}/admins`).then(r => r.json()).then(res => {
+        if (res.success) renderAdmins(res.data);
+    }).catch(() => { tbody.innerHTML = emptyCell(6, 'i-alert', '加载失败'); });
+}
+
+function renderAdmins(admins) {
+    const tbody = document.getElementById('adminTableBody');
+    if (!admins || admins.length === 0) {
+        tbody.innerHTML = emptyCell(6, 'i-user', '暂无管理员');
+        return;
+    }
+    const roleMap = { superadmin: '超级管理员', admin: '管理员' };
+    const isSuperAdmin = currentAdminRole === 'superadmin';
+    const currentPhone = localStorage.getItem('adminLogin') ? JSON.parse(localStorage.getItem('adminLogin')).phone : '';
+    tbody.innerHTML = admins.map(a => {
+        const isDefault = a.phone === 'admin';
+        const isSelf = a.phone === currentPhone;
+        const created = a.createdAt ? new Date(a.createdAt).toLocaleDateString('zh-CN') : '-';
+        const classes = (a.classes && a.classes.length > 0) ? a.classes.join('、') : '<span style="color:var(--ink-3)">未分配</span>';
+        return `<tr>
+            <td><strong>${a.name}</strong></td>
+            <td class="num">${a.phone} ${isDefault ? '<span class="tag tag-approved" style="font-size:11px;">默认</span>' : ''}</td>
+            <td>${roleMap[a.role] || a.role}</td>
+            <td class="cell-wrap" style="font-size:12px;">${classes}</td>
+            <td class="num">${created}</td>
+            <td>
+                ${isSuperAdmin ? `<button class="btn btn-ghost btn-sm btn-icon" onclick='editAdmin("${a.id}","${a.name}","${a.phone}","${a.role}",${JSON.stringify(a.classes || [])})' title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>` : ''}
+                ${isSuperAdmin && !isDefault && !isSelf ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="deleteAdmin('${a.id}','${a.name}')" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>` : ''}
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function showAddAdminModal() {
+    document.getElementById('adminModalTitle').textContent = '添加管理员';
+    ['editAdminId','adminName','adminPhone','adminPwd'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('adminRole').value = 'admin';
+    document.getElementById('pwdRequired').style.display = '';
+    document.getElementById('pwdHint').style.display = 'none';
+    loadClassesForAdmin([]);
+    document.getElementById('adminModal').classList.add('show');
+}
+
+function editAdmin(id, name, phone, role, classes) {
+    document.getElementById('adminModalTitle').textContent = '编辑管理员';
+    document.getElementById('editAdminId').value = id;
+    document.getElementById('adminName').value = name;
+    document.getElementById('adminPhone').value = phone;
+    document.getElementById('adminPwd').value = '';
+    document.getElementById('adminRole').value = role || 'admin';
+    document.getElementById('pwdRequired').style.display = 'none';
+    document.getElementById('pwdHint').style.display = '';
+    loadClassesForAdmin(classes || []);
+    document.getElementById('adminModal').classList.add('show');
+}
+
+function loadClassesForAdmin(selectedClasses) {
+    apiFetch(`${API_BASE}/classes`).then(r => r.json()).then(res => {
+        const container = document.getElementById('adminClassesContainer');
+        if (!res.success || !res.data || res.data.length === 0) {
+            container.innerHTML = '<div class="empty-hint">暂无班级数据</div>';
+            return;
+        }
+        container.innerHTML = res.data.map(c =>
+            `<label>
+                <input type="checkbox" class="admin-class-check" value="${c}" ${selectedClasses.includes(c) ? 'checked' : ''}> ${c}
+            </label>`
+        ).join('');
+    });
+}
+
+function getSelectedClasses() {
+    return [...document.querySelectorAll('.admin-class-check:checked')].map(cb => cb.value);
+}
+
+function closeAdminModal() {
+    document.getElementById('adminModal').classList.remove('show');
+}
+
+function saveAdmin() {
+    const editId = document.getElementById('editAdminId').value;
+    const name = document.getElementById('adminName').value.trim();
+    const phone = document.getElementById('adminPhone').value.trim();
+    const password = document.getElementById('adminPwd').value.trim();
+    const role = document.getElementById('adminRole').value;
+    const classes = getSelectedClasses();
+    if (!name || !phone) return showToast('请填写姓名和账号', 'error');
+    if (!editId && !password) return showToast('请填写密码', 'error');
+
+    const data = { name, phone, role, classes };
+    if (password) data.password = password;
+
+    if (editId) {
+        apiFetch(`${API_BASE}/admins/${editId}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+        }).then(r => r.json()).then(res => {
+            if (res.success) { showToast(res.message); closeAdminModal(); loadAdmins(); } else showToast(res.message, 'error');
+        });
+    } else {
+        data.password = password;
+        apiFetch(`${API_BASE}/admins`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+        }).then(r => r.json()).then(res => {
+            if (res.success) { showToast(res.message); closeAdminModal(); loadAdmins(); } else showToast(res.message, 'error');
+        });
+    }
+}
+
+function deleteAdmin(id, name) {
+    if (!confirm(`确定要删除管理员"${name}"吗？`)) return;
+    apiFetch(`${API_BASE}/admins/${id}`, {
+        method: 'DELETE'
+    }).then(r => r.json()).then(res => {
+        if (res.success) { showToast(res.message); loadAdmins(); } else showToast(res.message, 'error');
+    });
+}
+
+// ============ 工具函数 ============
+function showToast(msg, type = 'success') {
+    const icons = { success: 'i-check-circle', error: 'i-x-circle', info: 'i-info' };
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = ico(icons[type] || 'i-info') + ` <span>${msg}</span>`;
+    document.body.appendChild(toast);
+    Motion.toastIn(toast);
+    setTimeout(() => { toast.classList.add('out'); setTimeout(() => toast.remove(), 300); }, 3000);
+}
+
+document.getElementById('loginPassword').addEventListener('keyup', e => { if (e.key === 'Enter') doLogin(); });
+
+// ============ 移动端侧栏抽屉 ============
+function isDrawerMode() {
+    return window.matchMedia('(max-width: 960px)').matches;
+}
+function toggleSidebar() {
+    const layout = document.getElementById('adminPage');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (!layout || !backdrop) return;
+    const open = layout.classList.toggle('nav-open');
+    backdrop.classList.toggle('show', open);
+    const btn = document.getElementById('menuToggle');
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    document.documentElement.style.overflow = open ? 'hidden' : '';
+}
+function closeSidebar() {
+    const layout = document.getElementById('adminPage');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (!layout || !backdrop) return;
+    layout.classList.remove('nav-open');
+    backdrop.classList.remove('show');
+    const btn = document.getElementById('menuToggle');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+    document.documentElement.style.overflow = '';
+}
+// 导航点击后自动收起抽屉
+document.querySelectorAll('#sidebar .nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+        if (isDrawerMode()) closeSidebar();
+    });
+});
+// 从移动端拉宽到桌面时清掉抽屉状态
+window.matchMedia('(min-width: 961px)').addEventListener('change', e => {
+    if (e.matches) closeSidebar();
+});
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        const layout = document.getElementById('adminPage');
+        if (layout && layout.classList.contains('nav-open')) {
+            closeSidebar();
+            return;
+        }
+        document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show'));
+    }
+});
+
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('mousedown', e => { if (e.target === overlay) overlay.classList.remove('show'); });
+});
+
+// 卸载/离开页面时销毁 Lenis 与 ScrollTrigger，避免残留
+window.addEventListener('pagehide', () => Motion.destroy());
+window.addEventListener('beforeunload', () => Motion.destroy());
+
+// ============ 温馨提示管理 ============
+function loadTips() {
+    const tbody = document.getElementById('tipTableBody');
+    tbody.innerHTML = skeletonRows(4, 4);
+    apiFetch(`${API_BASE}/tips`).then(r => r.json()).then(res => {
+        if (res.success) renderTips(res.data || []);
+    }).catch(() => { tbody.innerHTML = emptyCell(4, 'i-alert', '加载失败'); });
+}
+
+function renderTips(tips) {
+    const tbody = document.getElementById('tipTableBody');
+    if (tips.length === 0) {
+        tbody.innerHTML = emptyCell(4, 'i-bulb', '暂无温馨提示', '点击右上角按钮添加');
+        return;
+    }
+    tbody.innerHTML = tips.map(t => {
+        const time = t.updatedAt ? new Date(t.updatedAt).toLocaleString('zh-CN') : '-';
+        const safeContent = (t.content || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+        return `<tr>
+            <td><strong>${t.className}</strong></td>
+            <td style="max-width:400px;white-space:pre-wrap;">${t.content || '<span style="color:var(--ink-3)">空</span>'}</td>
+            <td class="num">${time}</td>
+            <td>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="editTip('${t._id}','${t.className}','${safeContent}')" title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="deleteTip('${t._id}','${t.className}')" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function showAddTipModal() {
+    document.getElementById('tipModalTitle').textContent = '添加温馨提示';
+    document.getElementById('editTipId').value = '';
+    document.getElementById('tipClassName').value = '';
+    document.getElementById('tipContent').value = '欢迎来到杭州职业技术大学继续教育学院！请遵守校园管理规定，按时到校上课。如有疑问请联系：56700015。';
+    loadClassOptions();
+    document.getElementById('tipModal').classList.add('show');
+}
+
+function editTip(id, className, content) {
+    document.getElementById('tipModalTitle').textContent = '编辑温馨提示';
+    document.getElementById('editTipId').value = id;
+    document.getElementById('tipContent').value = content;
+    loadClassOptions(className);
+    document.getElementById('tipModal').classList.add('show');
+}
+
+function loadClassOptions(selected) {
+    apiFetch(`${API_BASE}/classes`).then(r => r.json()).then(res => {
+        const sel = document.getElementById('tipClassName');
+        sel.innerHTML = '<option value="">请选择班级</option>';
+        if (res.success && res.data) {
+            res.data.forEach(c => {
+                sel.innerHTML += `<option value="${c}" ${c === selected ? 'selected' : ''}>${c}</option>`;
+            });
+        }
+    });
+}
+
+function closeTipModal() { document.getElementById('tipModal').classList.remove('show'); }
+
+function saveTip() {
+    const id = document.getElementById('editTipId').value;
+    const className = document.getElementById('tipClassName').value;
+    const content = document.getElementById('tipContent').value.trim();
+    if (!className) return showToast('请选择班级', 'error');
+    apiFetch(`${API_BASE}/tips`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ className, content })
+    }).then(r => r.json()).then(res => {
+        if (res.success) { showToast(res.message); closeTipModal(); loadTips(); } else showToast(res.message, 'error');
+    });
+}
+
+function deleteTip(id, className) {
+    if (!confirm(`确定删除「${className}」的温馨提示？`)) return;
+    apiFetch(`${API_BASE}/tips/${id}`, { method: 'DELETE' }).then(r => r.json()).then(res => {
+        if (res.success) { showToast(res.message); loadTips(); } else showToast(res.message, 'error');
+    });
+}
+
+// ============ 管理员批量导入 ============
+function showAdminImportModal() {
+    document.getElementById('adminImportResult').innerHTML = '';
+    document.getElementById('adminFileInput').value = '';
+    document.getElementById('adminImportModal').classList.add('show');
+}
+function closeAdminImportModal() { document.getElementById('adminImportModal').classList.remove('show'); }
+
+const adminUploadZone = document.getElementById('adminUploadZone');
+if (adminUploadZone) {
+    adminUploadZone.addEventListener('click', () => document.getElementById('adminFileInput').click());
+}
+
+function handleAdminFileSelect(e) {
+    if (!e.target.files.length) return;
+    const file = e.target.files[0];
+    if (!file.name.match(/\.xlsx?$/i)) return showToast('请选择 Excel 文件', 'error');
+    const formData = new FormData();
+    formData.append('file', file);
+    document.getElementById('adminImportResult').innerHTML = '<div class="result-box result-info"><span class="result-icon">' + ico('i-clock') + '</span><div>正在导入...</div></div>';
+    apiFetch(`${API_BASE}/admins/import`, { method: 'POST', body: formData }).then(r => r.json()).then(res => {
+        if (res.success) {
+            const d = res.data;
+            let html = `<div class="result-box result-success"><span class="result-icon">${ico('i-check-circle')}</span><div>导入完成：共 ${d.total} 条，成功 ${d.added} 条，失败 ${d.failed} 条</div></div>`;
+            if (d.errors && d.errors.length > 0) {
+                html += '<div class="error-list">' + d.errors.map(e => `<div class="error-item">${ico('i-alert','ico-sm')} ${e}</div>`).join('') + '</div>';
+            }
+            document.getElementById('adminImportResult').innerHTML = html;
+            loadAdmins();
+        } else {
+            document.getElementById('adminImportResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>${res.message}</div></div>`;
+        }
+    });
+}
+</script>
+</body>
+</html>

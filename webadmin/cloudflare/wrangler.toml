@@ -1,0 +1,15 @@
+name = "hgd-edu-admin"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+WX_APPID = "wxcde7f3fd1d5fc715"
+CLOUD_ENV = "cloud1-d6gio7v8iff39bab7"
+
+# 密钥不要写在这里：部署时用 npx wrangler secret put WX_APP_SECRET
+# 执行 deploy.ps1 或见 DEPLOY.md
+
+[[kv_namespaces]]
+binding = "ADMIN_KV"
+# 部署前执行: npx wrangler kv namespace create ADMIN_KV ，把返回的 id 填在下一行
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
