@@ -226,6 +226,8 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
       try {
         const name = getField(row, fieldMap, 'name');
         const phone = String(getField(row, fieldMap, 'phone') || '').trim();
+        const idCard = getField(row, fieldMap, 'idCard');
+        const company = getField(row, fieldMap, 'company');
         const className = getField(row, fieldMap, 'className');
         const schedule = getField(row, fieldMap, 'schedule');
         const courseStartDate = getField(row, fieldMap, 'courseStartDate');
@@ -239,8 +241,8 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
         if (!schedule) { errors.push(`第${rowNum}行：上课时间段为空`); failed++; continue; }
         if (!location) { errors.push(`第${rowNum}行：上课地点为空`); failed++; continue; }
 
-        // 自动生成 courseDates
-        const courseDates = generateCourseDates(schedule, courseStartDate, courseEndDate);
+        // 自动生成 courseDates（支持逗号分隔多时间段）
+        const courseDates = generateCourseDatesMulti(schedule, courseStartDate, courseEndDate);
 
         // 确保日期字段为字符串格式
         const startD = parseExcelDate(courseStartDate);
@@ -248,7 +250,7 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
         const startStr = formatDateStr(startD) || String(courseStartDate || '');
         const endStr = formatDateStr(endD) || String(courseEndDate || '');
 
-        const studentData = { name, phone, className, schedule, deadline: endStr || '', location, courseDates, courseStartDate: startStr, courseEndDate: endStr };
+        const studentData = { name, phone, idCard: idCard || '', company: company || '', className, schedule, deadline: endStr || '', location, courseDates, courseStartDate: startStr, courseEndDate: endStr };
         const result = await callCloudFunction('addStudent', { data: studentData });
         if (result.message && result.message.includes('更新')) updated++; else added++;
       } catch (err) {
@@ -269,6 +271,8 @@ function detectFieldMapping(headers) {
   const aliases = {
     name: ['姓名', '名字', 'name', '学员姓名', '学生姓名'],
     phone: ['联系电话', '手机号', '手机', '电话', 'phone', '手机号码', '联系手机'],
+    idCard: ['身份证号码', '身份证', '身份证号', 'idCard', '身份证件号码'],
+    company: ['公司名称', '公司', '单位', 'company', '所属公司', '工作单位'],
     className: ['班级名称', '班级', '课程名称', '课程', 'className', '班名'],
     schedule: ['上课时间段', '上课时间', '时间', 'schedule', '时间段', '课程时间'],
     courseStartDate: ['课程开始日期', '开始日期', '课程开始', 'courseStartDate'],
@@ -311,7 +315,7 @@ function formatDateStr(d) {
   return `${y}-${m}-${day}`;
 }
 
-// 根据上课时间段+开始结束日期，自动生成具体上课日期
+// 根据上课时间段+开始结束日期，自动生成具体上课日期（单个时间段）
 function generateCourseDates(schedule, startDate, endDate) {
   if (!startDate || !endDate) return [];
   const dayMap = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '日': 0 };
@@ -338,6 +342,18 @@ function generateCourseDates(schedule, startDate, endDate) {
     d.setDate(d.getDate() + 7);
   }
   return dates;
+}
+
+// 支持逗号分隔的多时间段
+function generateCourseDatesMulti(schedule, startDate, endDate) {
+  const allDates = [];
+  const parts = schedule.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+  parts.forEach(part => {
+    const dates = generateCourseDates(part, startDate, endDate);
+    allDates.push(...dates);
+  });
+  allDates.sort((a, b) => a.date.localeCompare(b.date));
+  return allDates;
 }
 
 // 根据上课时间段+日期范围生成 courseDates（用于小程序端）
@@ -425,11 +441,11 @@ app.get('/api/export/students', async (req, res) => {
   try {
     const result = await callCloudFunction('getStudents');
     if (!result.success) return res.status(500).send('导出失败');
-    const data = [['姓名', '联系电话', '班级名称', '上课时间段', '课程开始日期', '课程结束日期', '上课截止时间', '上课地点']];
-    result.data.forEach(s => data.push([s.name, s.phone, s.className, s.schedule, s.courseStartDate || '', s.courseEndDate || '', s.deadline, s.location]));
+    const data = [['姓名', '联系电话', '身份证', '公司', '班级名称', '上课时间段', '课程开始日期', '课程结束日期', '上课截止时间', '上课地点']];
+    result.data.forEach(s => data.push([s.name, s.phone, s.idCard || '', s.company || '', s.className, s.schedule, s.courseStartDate || '', s.courseEndDate || '', s.deadline, s.location]));
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }];
+    ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 22 }, { wch: 25 }, { wch: 20 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }];
     XLSX.utils.book_append_sheet(wb, ws, '学员信息');
     const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
     res.setHeader('Content-Disposition', 'attachment; filename=students.xlsx');
@@ -442,14 +458,14 @@ app.get('/api/export/students', async (req, res) => {
 
 app.get('/api/template/download', (req, res) => {
   const data = [
-    ['姓名', '联系电话', '班级名称', '上课时间段', '课程开始日期', '课程结束日期', '上课截止时间', '上课地点'],
-    ['张三', '13800138001', '计算机基础班', '周一上午 9:00-11:00', '2026-09-01', '2026-12-31', '2026-12-31', '教学楼301教室'],
-    ['李四', '13800138002', '会计实务班', '周三下午 14:00-16:00', '2026-09-01', '2026-12-31', '2026-12-31', '实训楼205教室'],
-    ['王五', '13800138003', '英语提高班', '周五晚上 18:30-20:30', '2026-09-01', '2026-12-31', '2026-12-31', '外语楼102教室']
+    ['姓名', '联系电话', '身份证号码', '公司名称', '班级名称', '上课时间段', '课程开始日期', '课程结束日期', '上课截止时间', '上课地点'],
+    ['张三', '13800138001', '330102199001011234', '杭州科技有限公司', '计算机基础班', '周一上午 9:00-11:00', '2026-09-01', '2026-12-31', '2026-12-31', '教学楼301教室'],
+    ['李四', '13800138002', '330102199505052345', '浙江信息工程有限公司', '会计实务班', '周三下午 14:00-16:00, 周五上午 9:00-11:00', '2026-09-01', '2026-12-31', '2026-12-31', '实训楼205教室'],
+    ['王五', '13800138003', '330102198808083456', '杭州教育发展有限公司', '英语提高班', '周二晚上 18:30-20:30, 周四晚上 18:30-20:30', '2026-09-01', '2026-12-31', '2026-12-31', '外语楼102教室']
   ];
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }];
+  ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 22 }, { wch: 25 }, { wch: 20 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }];
   XLSX.utils.book_append_sheet(wb, ws, '学员信息');
   const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
   res.setHeader('Content-Disposition', "attachment; filename*=UTF-8''%E5%AD%A6%E5%91%98%E4%BF%A1%E6%81%AF%E5%AF%BC%E5%85%A5%E6%A8%A1%E6%9D%BF.xlsx");
