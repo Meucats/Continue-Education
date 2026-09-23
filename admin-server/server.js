@@ -399,6 +399,15 @@ app.post('/api/requests/:id/reject', async (req, res) => {
 });
 
 // ====== 账户管理 ======
+app.post('/api/students/:id/reset-password', async (req, res) => {
+  try {
+    const result = await callCloudFunction('resetPassword', { id: req.params.id });
+    res.json(result);
+  } catch (err) {
+    res.json({ success: false, message: err.message });
+  }
+});
+
 app.get('/api/accounts', async (req, res) => {
   try {
     const result = await callCloudFunction('getAccounts');

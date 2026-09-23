@@ -1137,6 +1137,7 @@ function renderStudents(students) {
             <td>${s.deadline || '-'}${courseDatesCount > 0 ? '<br><small style="color:var(--primary)">' + courseDatesCount + '节课</small>' : ''}</td>
             <td>
                 <button class="btn btn-ghost btn-sm" onclick="editStudent('${s._id}')" title="编辑">✏️</button>
+                <button class="btn btn-ghost btn-sm" onclick="resetPassword('${s._id}','${s.name}')" title="重置密码">🔑</button>
                 <button class="btn btn-ghost btn-sm" onclick="deleteStudent('${s._id}','${s.name}')" title="删除">🗑️</button>
             </td>
         </tr>`;
@@ -1261,6 +1262,17 @@ function saveStudent() {
             else showToast(res.message, 'error');
         });
     }
+}
+
+function resetPassword(id, name) {
+    if (!confirm(`确定要重置学员「${name}」的密码吗？\n重置后密码为身份证后6位，登录后需重新修改密码。`)) return;
+    fetch(`${API_BASE}/students/${id}/reset-password`, { method: 'POST' }).then(r => r.json()).then(res => {
+        if (res.success) {
+            showToast('密码已重置为：' + res.newPassword);
+        } else {
+            showToast(res.message, 'error');
+        }
+    });
 }
 
 function deleteStudent(id, name) {
