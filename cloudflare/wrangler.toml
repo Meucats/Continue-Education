@@ -1,0 +1,14 @@
+name = "hgd-edu-admin"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+WX_APPID = "wxcde7f3fd1d5fc715"
+CLOUD_ENV = "cloud1-d6gio7v8iff39bab7"
+
+# 部署前需设置密钥（在Cloudflare控制台设置）
+# WX_APP_SECRET = "你的微信AppSecret"
+
+[[kv_namespaces]]
+binding = "ADMIN_KV"
+id = "部署后在Cloudflare控制台创建KV命名空间获取ID"
