@@ -50,6 +50,22 @@ export default {
         return json({ success: true, message: '添加成功' });
       }
 
+      // 编辑管理员
+      if (path.match(/^\/api\/admins\/[^/]+$/) && request.method === 'PUT') {
+        const id = path.split('/')[3];
+        const body = await request.json();
+        const admins = await getAdmins(env);
+        const idx = admins.findIndex(a => a.id === id);
+        if (idx < 0) return json({ success: false, message: '管理员不存在' });
+        if (body.name) admins[idx].name = body.name;
+        if (body.phone) admins[idx].phone = body.phone;
+        if (body.password) admins[idx].password = body.password;
+        if (body.role) admins[idx].role = body.role;
+        if (body.classes !== undefined) admins[idx].classes = body.classes;
+        await env.ADMIN_KV.put('admins', JSON.stringify(admins));
+        return json({ success: true, message: '更新成功' });
+      }
+
       // 删除管理员
       if (path.startsWith('/api/admins/') && request.method === 'DELETE') {
         const id = path.split('/').pop();
@@ -71,6 +87,14 @@ export default {
       if (path === '/api/students' && request.method === 'POST') {
         const body = await request.json();
         const result = await callCloud(env, 'addStudent', { data: body });
+        return json(result);
+      }
+
+      // 编辑学员
+      if (path.match(/^\/api\/students\/[^/]+$/) && request.method === 'PUT') {
+        const id = path.split('/')[3];
+        const body = await request.json();
+        const result = await callCloud(env, 'updateStudent', { data: { _id: id, ...body } });
         return json(result);
       }
 
@@ -326,7 +350,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .login-box h2{text-align:center;margin-bottom:30px;color:var(--primary)}
 .form-group{margin-bottom:20px}
 .form-group label{display:block;font-size:14px;color:var(--text2);margin-bottom:6px}
-.form-group input{width:100%;height:44px;border:1px solid var(--border);border-radius:8px;padding:0 12px;font-size:15px}
+.form-group input,.form-group select,.form-group textarea{width:100%;height:44px;border:1px solid var(--border);border-radius:8px;padding:0 12px;font-size:15px;box-sizing:border-box;background:#fff;color:var(--text)}
+.form-group textarea{height:auto;min-height:88px;padding:10px 12px;resize:vertical}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:560px){.form-row{grid-template-columns:1fr}}
 .btn{display:inline-flex;align-items:center;justify-content:center;height:40px;border:none;border-radius:8px;font-size:14px;cursor:pointer;padding:0 20px;gap:6px}
 .btn-primary{background:var(--primary);color:#fff}
 .btn-success{background:var(--success);color:#fff}
@@ -455,6 +482,7 @@ table{min-width:640px}
 <div class="toolbar">
 <input id="studentSearch" placeholder="搜索姓名/手机/身份证/公司/班级" onkeyup="searchStudents()">
 <button class="btn btn-primary btn-sm" onclick="loadStudents()">搜索</button>
+<button class="btn btn-primary btn-sm" onclick="showAddStudentModal()">+ 添加学员</button>
 <button class="btn btn-danger btn-sm" onclick="batchDeleteStudents()">批量删除</button>
 <button class="btn btn-success btn-sm" onclick="location.href='/api/export/students'">导出Excel</button>
 </div>
@@ -518,18 +546,49 @@ table{min-width:640px}
 </div>
 </div>
 
+<!-- 添加/编辑学员弹窗 -->
+<div id="studentModal" class="modal-mask hidden">
+<div class="modal-box" style="width:min(520px,92vw)">
+<h3 id="studentModalTitle">添加学员</h3>
+<input type="hidden" id="editStudentId">
+<div class="form-row">
+<div class="form-group"><label>姓名 *</label><input id="stuName" placeholder="请输入姓名"></div>
+<div class="form-group"><label>联系电话 *</label><input id="stuPhone" placeholder="请输入11位手机号" maxlength="11"></div>
+</div>
+<div class="form-row">
+<div class="form-group"><label>身份证号</label><input id="stuIdCard" placeholder="用于设置初始密码（身份证后6位）" maxlength="18"></div>
+<div class="form-group"><label>公司/单位</label><input id="stuCompany" placeholder="请输入所在公司或单位"></div>
+</div>
+<div class="form-group"><label>班级名称 *</label><input id="stuClass" placeholder="如：计算机基础班"></div>
+<div class="form-row">
+<div class="form-group"><label>上课时间段 *</label><input id="stuSchedule" placeholder="如：周一上午 9:00-11:00"></div>
+<div class="form-group"><label>上课地点 *</label><input id="stuLocation" placeholder="如：教学楼301教室"></div>
+</div>
+<div class="form-row">
+<div class="form-group"><label>课程开始日期 *</label><input id="stuStartDate" type="date"></div>
+<div class="form-group"><label>课程结束日期 *</label><input id="stuEndDate" type="date"></div>
+</div>
+<div class="form-group"><label>上课截止时间 *</label><input id="stuDeadline" type="date"></div>
+<div id="courseDatesPreview" style="display:none;margin-top:8px;padding:12px 14px;background:#e8f0fe;border:1px solid #d2e3fc;border-radius:10px;font-size:13px;color:#10428f;line-height:1.7;"></div>
+<div class="modal-btns">
+<button class="btn btn-ghost" onclick="hideModal('studentModal')">取消</button>
+<button class="btn btn-primary" onclick="saveStudent()">保存</button>
+</div>
+</div>
+</div>
 <!-- 添加管理员弹窗 -->
 <div id="adminModal" class="modal-mask hidden">
 <div class="modal-box">
-<h3>添加管理员</h3>
+<h3 id="adminModalTitle">添加管理员</h3>
+<input type="hidden" id="editAdminId">
 <div class="form-group"><label>名称</label><input id="adminName"></div>
 <div class="form-group"><label>账号(手机)</label><input id="adminPhone"></div>
-<div class="form-group"><label>密码</label><input id="adminPwd" type="password"></div>
+<div class="form-group"><label>密码</label><input id="adminPwd" type="password"><div id="pwdHint" style="display:none;font-size:12px;color:#999;margin-top:4px;">留空则不修改密码</div></div>
 <div class="form-group"><label>角色</label><select id="adminRole"><option value="admin">管理员</option><option value="superadmin">超级管理员</option></select></div>
 <div class="form-group"><label>负责班级</label><div id="adminClassesBox" style="max-height:100px;overflow-y:auto;border:1px solid #e8e8e8;border-radius:8px;padding:8px;font-size:13px;">加载中...</div></div>
 <div class="modal-btns">
 <button class="btn btn-ghost" onclick="hideModal('adminModal')">取消</button>
-<button class="btn btn-primary" onclick="addAdmin()">确认</button>
+<button class="btn btn-primary" onclick="saveAdmin()">确认</button>
 </div>
 </div>
 </div>
@@ -565,6 +624,7 @@ table{min-width:640px}
 <script>
 const API=location.origin;
 let allStudents=[];
+let allAdmins=[];
 
 // 动效基座：taste 参数 + Lenis/ScrollTrigger 同步 + cleanup（模板内禁用反引号与模板插值）
 const Motion=(()=>{
@@ -625,7 +685,6 @@ return{reduce:reduce,initScroll:initScroll,destroy:destroy,loginEntrance:loginEn
 
 function toast(msg){const d=document.createElement('div');d.className='toast';d.textContent=msg;document.body.appendChild(d);setTimeout(()=>d.remove(),3000)}
 function hideModal(id){document.getElementById(id).classList.add('hidden')}
-function showAddAdminModal(){document.getElementById('adminModal').classList.remove('hidden')}
 
 function isDrawerMode(){return window.matchMedia('(max-width:768px)').matches}
 function toggleSidebar(){
@@ -708,11 +767,98 @@ if(r.success){allStudents=r.data||[];renderStudents(allStudents);}
 }
 function renderStudents(students){
 const tbody=document.getElementById('studentTableBody');
-if(!students.length){tbody.innerHTML='<tr><td colspan="12"><div style="text-align:center;padding:40px;color:#999">暂无学员数据</div></td></tr>';return;}
+if(!students.length){tbody.innerHTML='<tr><td colspan="12"><div style="text-align:center;padding:40px;color:#999">暂无学员数据，点击上方「+ 添加学员」</div></td></tr>';return;}
 tbody.innerHTML=students.map(s=>{
 const cdc=(s.courseDates&&s.courseDates.length)?s.courseDates.length:0;
-return '<tr><td><input type="checkbox" class="stu-check" value="'+s._id+'"></td><td><b>'+s.name+'</b></td><td>'+s.phone+'</td><td>'+(s.idCard||'-')+'</td><td>'+(s.company||'-')+'</td><td>'+s.className+'</td><td>'+s.schedule+'</td><td>'+s.location+'</td><td>'+(s.courseStartDate||'-')+'</td><td>'+(s.courseEndDate||'-')+'</td><td>'+(s.deadline||'-')+(cdc>0?'<br><small style="color:var(--primary)">'+cdc+'节课</small>':'')+'</td><td><button class="btn btn-ghost btn-sm" onclick="resetPwd(\\''+s._id+'\\',\\''+s.name+'\\')">🔑</button> <button class="btn btn-ghost btn-sm" onclick="delStudent(\\''+s._id+'\\',\\''+s.name+'\\')">🗑️</button></td></tr>';
+return '<tr><td><input type="checkbox" class="stu-check" value="'+s._id+'"></td><td><b>'+s.name+'</b></td><td>'+s.phone+'</td><td>'+(s.idCard||'-')+'</td><td>'+(s.company||'-')+'</td><td>'+s.className+'</td><td>'+s.schedule+'</td><td>'+s.location+'</td><td>'+(s.courseStartDate||'-')+'</td><td>'+(s.courseEndDate||'-')+'</td><td>'+(s.deadline||'-')+(cdc>0?'<br><small style="color:var(--primary)">'+cdc+'节课</small>':'')+'</td><td><button class="btn btn-ghost btn-sm" onclick="editStudent(\\''+s._id+'\\')">✏️</button> <button class="btn btn-ghost btn-sm" onclick="resetPwd(\\''+s._id+'\\',\\''+s.name+'\\')">🔑</button> <button class="btn btn-ghost btn-sm" onclick="delStudent(\\''+s._id+'\\',\\''+s.name+'\\')">🗑️</button></td></tr>';
 }).join('');
+}
+function showAddStudentModal(){
+document.getElementById('studentModalTitle').textContent='添加学员';
+['editStudentId','stuName','stuPhone','stuIdCard','stuCompany','stuClass','stuSchedule','stuStartDate','stuEndDate','stuDeadline','stuLocation'].forEach(function(id){document.getElementById(id).value='';});
+const preview=document.getElementById('courseDatesPreview');
+if(preview)preview.style.display='none';
+document.getElementById('studentModal').classList.remove('hidden');
+}
+function editStudent(id){
+const s=allStudents.find(function(x){return x._id===id;});
+if(!s)return;
+document.getElementById('studentModalTitle').textContent='编辑学员';
+document.getElementById('editStudentId').value=id;
+document.getElementById('stuName').value=s.name||'';
+document.getElementById('stuPhone').value=s.phone||'';
+document.getElementById('stuIdCard').value=s.idCard||'';
+document.getElementById('stuCompany').value=s.company||'';
+document.getElementById('stuClass').value=s.className||'';
+document.getElementById('stuSchedule').value=s.schedule||'';
+document.getElementById('stuStartDate').value=s.courseStartDate||'';
+document.getElementById('stuEndDate').value=s.courseEndDate||'';
+document.getElementById('stuDeadline').value=s.deadline||'';
+document.getElementById('stuLocation').value=s.location||'';
+previewCourseDates();
+document.getElementById('studentModal').classList.remove('hidden');
+}
+function previewCourseDates(){
+const schedule=document.getElementById('stuSchedule').value;
+const startDate=document.getElementById('stuStartDate').value;
+const endDate=document.getElementById('stuEndDate').value;
+const preview=document.getElementById('courseDatesPreview');
+if(!preview)return;
+if(!schedule||!startDate||!endDate){preview.style.display='none';return;}
+const dates=generateCourseDatesJS(schedule,startDate,endDate);
+if(!dates.length){preview.style.display='none';return;}
+preview.style.display='block';
+preview.innerHTML='<strong>自动排课预览（共'+dates.length+'节）</strong><br>'+dates.slice(0,10).map(function(d){return d.date+' '+d.timeSlot;}).join('<br>')+(dates.length>10?'<br>... 等共 '+dates.length+' 节':'');
+}
+function generateCourseDatesJS(schedule,startDate,endDate){
+const dayMap={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'日':0};
+let targetDay=-1;
+for(const key of Object.keys(dayMap)){if(schedule.indexOf(key)>=0){targetDay=dayMap[key];break;}}
+if(targetDay<0)return[];
+const timeMatch=schedule.match(/(\d{1,2}:\d{2})\s*[-~]\s*(\d{1,2}:\d{2})/);
+const timeSlot=timeMatch?timeMatch[0]:schedule;
+const dates=[];
+const start=new Date(startDate);
+const end=new Date(endDate);
+const d=new Date(start);
+while(d.getDay()!==targetDay&&d<=end)d.setDate(d.getDate()+1);
+while(d<=end){
+const y=d.getFullYear();
+const m=String(d.getMonth()+1).padStart(2,'0');
+const day=String(d.getDate()).padStart(2,'0');
+dates.push({date:y+'-'+m+'-'+day,timeSlot:timeSlot});
+d.setDate(d.getDate()+7);
+}
+return dates;
+}
+function saveStudent(){
+const editId=document.getElementById('editStudentId').value;
+const schedule=document.getElementById('stuSchedule').value.trim();
+const courseStartDate=document.getElementById('stuStartDate').value;
+const courseEndDate=document.getElementById('stuEndDate').value;
+const deadline=document.getElementById('stuDeadline').value||courseEndDate;
+const data={
+name:document.getElementById('stuName').value.trim(),
+phone:document.getElementById('stuPhone').value.trim(),
+className:document.getElementById('stuClass').value.trim(),
+schedule:schedule,
+courseStartDate:courseStartDate,
+courseEndDate:courseEndDate,
+deadline:deadline,
+location:document.getElementById('stuLocation').value.trim(),
+idCard:document.getElementById('stuIdCard').value.trim(),
+company:document.getElementById('stuCompany').value.trim(),
+courseDates:generateCourseDatesJS(schedule,courseStartDate,courseEndDate)
+};
+if(!data.name||!data.phone||!data.className||!data.schedule||!data.courseStartDate||!data.courseEndDate||!data.location)return toast('请填写所有必填字段');
+if(courseStartDate&&courseEndDate&&courseStartDate>courseEndDate)return toast('课程结束日期必须大于等于课程开始日期');
+if(deadline&&courseEndDate&&deadline<courseEndDate)return toast('上课截止时间必须大于等于课程结束日期');
+const url=editId?'/api/students/'+editId:'/api/students';
+const opt={method:editId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)};
+fetch(API+url,opt).then(function(r){return r.json();}).then(function(res){
+if(res.success){toast(res.message||'保存成功');hideModal('studentModal');loadStudents();}
+else toast(res.message||'保存失败');
+}).catch(function(){toast('网络错误');});
 }
 function searchStudents(){
 const k=document.getElementById('studentSearch').value.trim().toLowerCase();
@@ -793,19 +939,38 @@ const r=await api('/api/admins');
 const cr=await api('/api/classes');
 if(cr.success)allClasses=cr.data||[];
 if(r.success){
+allAdmins=r.data||[];
 const tbody=document.getElementById('adminTableBody');
-tbody.innerHTML=(r.data||[]).map(a=>{
+tbody.innerHTML=allAdmins.map(a=>{
 const cls=(a.classes&&a.classes.length>0)?a.classes.join('、'):'<span style="color:#999">未分配</span>';
-return '<tr><td><b>'+a.name+'</b></td><td>'+a.phone+'</td><td>'+(a.role==='superadmin'?'超级管理员':'管理员')+'</td><td style="font-size:12px;">'+cls+'</td><td>'+(a.createdAt||'-')+'</td><td>'+(a.phone==='admin'?'<span style="color:#999">默认</span>':'<button class="btn btn-ghost btn-sm" onclick="delAdmin(\\''+a.id+'\\',\\''+a.name+'\\')">删除</button>')+'</td></tr>';
+const editBtn=a.phone==='admin'?'':'<button class="btn btn-ghost btn-sm" onclick="editAdmin(\\''+a.id+'\\')">✏️</button> ';
+const delBtn=a.phone==='admin'?'<span style="color:#999">默认</span>':('<button class="btn btn-ghost btn-sm" onclick="delAdmin(\\''+a.id+'\\',\\''+a.name+'\\')">删除</button>');
+return '<tr><td><b>'+a.name+'</b></td><td>'+a.phone+'</td><td>'+(a.role==='superadmin'?'超级管理员':'管理员')+'</td><td style="font-size:12px;">'+cls+'</td><td>'+(a.createdAt||'-')+'</td><td>'+editBtn+delBtn+'</td></tr>';
 }).join('');
 }
 }
 function showAddAdminModal(){
+document.getElementById('adminModalTitle').textContent='添加管理员';
+document.getElementById('editAdminId').value='';
 document.getElementById('adminName').value='';
 document.getElementById('adminPhone').value='';
 document.getElementById('adminPwd').value='';
 document.getElementById('adminRole').value='admin';
+document.getElementById('pwdHint').style.display='none';
 loadClassesCheckboxes([]);
+document.getElementById('adminModal').classList.remove('hidden');
+}
+function editAdmin(id){
+const a=allAdmins.find(function(x){return x.id===id;});
+if(!a)return;
+document.getElementById('adminModalTitle').textContent='编辑管理员';
+document.getElementById('editAdminId').value=id;
+document.getElementById('adminName').value=a.name||'';
+document.getElementById('adminPhone').value=a.phone||'';
+document.getElementById('adminPwd').value='';
+document.getElementById('adminRole').value=a.role||'admin';
+document.getElementById('pwdHint').style.display='block';
+loadClassesCheckboxes(a.classes||[]);
 document.getElementById('adminModal').classList.remove('hidden');
 }
 function loadClassesCheckboxes(selected){
@@ -814,16 +979,26 @@ if(!allClasses.length){box.innerHTML='<span style="color:#999">暂无班级</spa
 box.innerHTML=allClasses.map(c=>'<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px;cursor:pointer;"><input type="checkbox" class="admin-class-cb" value="'+c+'" '+(selected.includes(c)?'checked':'')+'>'+c+'</label>').join('');
 }
 function getCheckedClasses(){return[...document.querySelectorAll('.admin-class-cb:checked')].map(cb=>cb.value);}
-async function addAdmin(){
+async function saveAdmin(){
+const editId=document.getElementById('editAdminId').value;
 const name=document.getElementById('adminName').value.trim();
 const phone=document.getElementById('adminPhone').value.trim();
 const pwd=document.getElementById('adminPwd').value.trim();
 const role=document.getElementById('adminRole').value;
 const classes=getCheckedClasses();
-if(!name||!phone||!pwd)return toast('请填写所有字段');
-const r=await api('/api/admins',{name,phone,password:pwd,role,classes});
-if(r.success){toast('添加成功');hideModal('adminModal');loadAdmins();}else toast(r.message);
+if(!name||!phone)return toast('请填写名称和账号');
+if(!editId&&!pwd)return toast('请填写密码');
+const data={name,phone,role,classes};
+if(pwd)data.password=pwd;
+let r;
+if(editId){
+r=await fetch(API+'/api/admins/'+editId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(function(x){return x.json();});
+}else{
+r=await api('/api/admins',data);
 }
+if(r.success){toast(r.message||'保存成功');hideModal('adminModal');loadAdmins();}else toast(r.message);
+}
+function addAdmin(){return saveAdmin();}
 async function delAdmin(id,name){if(!confirm('删除管理员「'+name+'」？'))return;const r=await fetch(API+'/api/admins/'+id,{method:'DELETE'});const d=await r.json();if(d.success){toast('已删除');loadAdmins();}else toast(d.message);}
 
 // 温馨提示管理
