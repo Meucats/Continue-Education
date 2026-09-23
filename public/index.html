@@ -674,6 +674,8 @@
                                     <th width="40"><input type="checkbox" id="checkAll" onchange="toggleCheckAll()"></th>
                                     <th>姓名</th>
                                     <th>联系电话</th>
+                                    <th>身份证</th>
+                                    <th>公司</th>
                                     <th>班级名称</th>
                                     <th>上课时间</th>
                                     <th>上课地点</th>
@@ -1114,7 +1116,7 @@ function loadStudents() {
 function renderStudents(students) {
     const tbody = document.getElementById('studentTableBody');
     if (students.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">暂无学员数据</div><div class="empty-hint">点击右上角「添加学员」或「批量导入」</div></div></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">暂无学员数据</div><div class="empty-hint">点击右上角「添加学员」或「批量导入」</div></div></td></tr>';
         return;
     }
     tbody.innerHTML = students.map(s => {
@@ -1123,6 +1125,8 @@ function renderStudents(students) {
             <td><input type="checkbox" class="stu-check" value="${s._id}"></td>
             <td><strong>${s.name}</strong></td>
             <td>${s.phone}</td>
+            <td>${s.idCard || '-'}</td>
+            <td>${s.company || '-'}</td>
             <td>${s.className}</td>
             <td>${s.schedule}</td>
             <td>${s.location}</td>
@@ -1140,7 +1144,7 @@ function renderStudents(students) {
 function searchStudents() {
     const key = document.getElementById('studentSearch').value.trim().toLowerCase();
     if (!key) { renderStudents(allStudents); return; }
-    renderStudents(allStudents.filter(s => s.name.toLowerCase().includes(key) || s.phone.includes(key) || (s.className && s.className.toLowerCase().includes(key))));
+    renderStudents(allStudents.filter(s => s.name.toLowerCase().includes(key) || s.phone.includes(key) || (s.className && s.className.toLowerCase().includes(key)) || (s.idCard && s.idCard.includes(key)) || (s.company && s.company.toLowerCase().includes(key))));
 }
 
 function toggleCheckAll() {
