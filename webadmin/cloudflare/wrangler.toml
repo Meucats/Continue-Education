@@ -12,4 +12,4 @@ CLOUD_ENV = "cloud1-d6gio7v8iff39bab7"
 [[kv_namespaces]]
 binding = "ADMIN_KV"
 # 部署前执行: npx wrangler kv namespace create ADMIN_KV ，把返回的 id 填在下一行
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "e1b15a9f9e4d437baa0f287f6a63da27"
