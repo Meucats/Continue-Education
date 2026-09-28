@@ -1,0 +1,52 @@
+<view class="mine-page m-page-enter {{isWarm ? 'warm-theme' : ''}}">
+  <view class="user-card {{isLoggedIn ? 'logged' : 'unlogged'}}">
+    <view class="user-avatar">{{isLoggedIn ? (userInfo.name[0] || '学') : '未'}}</view>
+    <view class="user-info" wx:if="{{isLoggedIn}}">
+      <view class="user-name">{{userInfo.name}}</view>
+      <view class="user-phone num">{{userInfo.phone}}</view>
+      <view class="user-idcard num" wx:if="{{maskedIdCard}}">身份证：{{maskedIdCard}}</view>
+    </view>
+    <view class="user-info" wx:else>
+      <view class="user-name">未登录</view>
+      <view class="user-phone">点击下方按钮登录</view>
+    </view>
+  </view>
+
+  <view class="menu-card m-stagger">
+    <view class="menu-item" bindtap="goToLogin" wx:if="{{!isLoggedIn}}">
+      <view class="menu-ic-wrap"><view class="ic ic-g-key"></view></view>
+      <view class="menu-text">立即登录</view>
+      <view class="menu-arrow ic ic-g-arrow"></view>
+    </view>
+    <view class="menu-item" bindtap="onLogout" wx:else>
+      <view class="menu-ic-wrap"><view class="ic ic-g-out"></view></view>
+      <view class="menu-text">退出登录</view>
+      <view class="menu-arrow ic ic-g-arrow"></view>
+    </view>
+    <view class="menu-item" bindtap="goToSchedule">
+      <view class="menu-ic-wrap"><view class="ic ic-g-cal"></view></view>
+      <view class="menu-text">我的课表</view>
+      <view class="menu-arrow ic ic-g-arrow"></view>
+    </view>
+    <view class="menu-item" bindtap="goToConsult">
+      <view class="menu-ic-wrap"><view class="ic ic-g-building"></view></view>
+      <view class="menu-text">入校申请</view>
+      <view class="menu-arrow ic ic-g-arrow"></view>
+    </view>
+  </view>
+
+  <view class="contact-card">
+    <view class="contact-title">
+      <view class="ic ic-g-pin ct-ic"></view>
+      联系我们
+    </view>
+    <view class="i-row">
+      <text class="i-k">咨询地点</text>
+      <text class="i-v">继教院 3406 办公室</text>
+    </view>
+    <view class="i-row">
+      <text class="i-k">联系电话</text>
+      <text class="i-v num" bindtap="callPhone">56700015</text>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,55 @@
+<view class="schedule-page m-page-enter {{isWarm ? 'warm-theme' : ''}}">
+  <view class="calendar-section">
+    <view class="month-nav">
+      <view class="nav-btn" bindtap="prevMonth" aria-label="上一月">‹</view>
+      <view class="month-title num">{{currentYear}}年{{currentMonth}}月</view>
+      <view class="nav-btn" bindtap="nextMonth" aria-label="下一月">›</view>
+    </view>
+    <view class="weekday-header">
+      <view class="weekday" wx:for="{{weekdays}}" wx:key="*this">{{item}}</view>
+    </view>
+    <view class="day-grid">
+      <view class="day-cell {{item.isToday ? 'today' : ''}} {{item.isSelected ? 'selected' : ''}} {{item.hasCourse ? 'has-course' : ''}} {{item.isCurrentMonth ? '' : 'other-month'}}"
+        wx:for="{{calendarDays}}" wx:key="index"
+        bindtap="selectDay" data-day="{{item}}">
+        <text class="day-number num">{{item.day}}</text>
+        <view class="dot-bar" wx:if="{{item.hasCourse && item.isCurrentMonth}}">
+          <view class="course-dot"></view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="course-section">
+    <block wx:if="{{isLoggedIn}}">
+      <view class="week-course-list" wx:if="{{weekCourses.length > 0}}">
+        <view class="wc-card" wx:for="{{weekCourses}}" wx:key="index">
+          <view class="wc-card-header">
+            <view class="wc-card-date num">{{item.dateMonth}}{{item.dateDay}} {{item.weekday}}</view>
+            <view class="wc-card-time num">{{item.timeSlot}}</view>
+            <view class="wc-card-status {{item.isEnded ? 'st-ended' : 'st-active'}}">{{item.isEnded ? '已结束' : '有效'}}</view>
+          </view>
+          <view class="wc-card-body">
+            <view class="wc-card-class">{{item.className}}</view>
+            <view class="wc-card-loc" wx:if="{{item.location}}">
+              <view class="ic ic-g-pin loc-ic"></view>
+              <text>{{item.location}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="e-box" wx:else>
+        <view class="ic ic-g-inbox"></view>
+        <view class="e-t">本周暂无课程</view>
+        <view class="e-d">可在日历中选择其他日期查看</view>
+      </view>
+    </block>
+
+    <view class="login-prompt" wx:else>
+      <view class="ic ic-g-lock prompt-ic"></view>
+      <view class="prompt-text">登录后可查看个人课程安排</view>
+      <button class="btn-primary prompt-btn" bindtap="goToLogin">立即登录</button>
+    </view>
+  </view>
+</view>

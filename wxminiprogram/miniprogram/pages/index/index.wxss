@@ -1,0 +1,303 @@
+.index-page {
+  min-height: 100vh;
+  background: var(--bg);
+  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+}
+
+.index-page.m-page-enter .feature-item {
+  animation: m-fade-up var(--dur-base) var(--ease-out) both;
+}
+.index-page.m-page-enter .feature-item:nth-child(1) { animation-delay: 80ms; }
+.index-page.m-page-enter .feature-item:nth-child(2) { animation-delay: 130ms; }
+.index-page.m-page-enter .feature-item:nth-child(3) { animation-delay: 180ms; }
+
+.index-page.m-page-enter .section-card,
+.index-page.m-page-enter .tip-card {
+  animation: m-fade-up var(--dur-base) var(--ease-out) both;
+  animation-delay: 200ms;
+}
+.index-page.m-page-enter .tip-card { animation-delay: 260ms; }
+
+/* 暖色主题：token 整体切换（入校申请已通过且未过期） */
+.warm-theme {
+  --accent: #c2410c;
+  --accent-strong: #9a3412;
+  --accent-soft: #ffedd5;
+  --accent-line: #fed7aa;
+}
+
+.top-banner {
+  background: var(--accent);
+  padding: 48rpx 40rpx 64rpx;
+}
+
+.banner-inner {
+  display: flex;
+  align-items: center;
+  gap: 22rpx;
+}
+
+.banner-mark {
+  width: 92rpx;
+  height: 92rpx;
+  flex-shrink: 0;
+  display: block;
+  background: #fff;
+  border-radius: 50%;
+  padding: 8rpx;
+  box-sizing: border-box;
+  box-shadow: 0 6rpx 16rpx rgba(0, 0, 0, 0.14);
+  border: 2rpx solid rgba(255, 255, 255, 0.65);
+}
+
+.banner-school {
+  font-size: 35rpx;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 1rpx;
+}
+
+.banner-college {
+  font-size: 32rpx;
+  color: rgba(255, 255, 255, 0.82);
+  margin-top: 4rpx;
+}
+
+.greeting-bar {
+  padding: 24rpx 30rpx 0;
+}
+
+.greeting-text {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.feature-grid {
+  display: flex;
+  justify-content: space-between;
+  padding: 24rpx;
+}
+
+.feature-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--surface);
+  border-radius: var(--r-card);
+  padding: 28rpx 8rpx;
+  margin: 0 8rpx;
+  box-shadow: var(--shadow-1);
+}
+
+.feature-item:first-child { margin-left: 0; }
+.feature-item:last-child { margin-right: 0; }
+.feature-item { transition: background-color var(--dur-fast) ease, transform var(--dur-fast) var(--ease-out); }
+.feature-item:active { background: var(--surface-2); transform: scale(0.98); }
+
+.feature-icon {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 22rpx;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14rpx;
+}
+
+.feature-icon .ic {
+  width: 42rpx;
+  height: 42rpx;
+}
+
+.feature-title {
+  font-size: 27rpx;
+  font-weight: 650;
+  color: var(--ink);
+  margin-bottom: 6rpx;
+}
+
+.feature-desc {
+  font-size: 22rpx;
+  color: var(--ink-3);
+}
+
+.section-card {
+  margin: 20rpx 24rpx;
+}
+
+.s-title {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.row-ic {
+  width: 24rpx;
+  height: 24rpx;
+  margin-right: 8rpx;
+  vertical-align: -4rpx;
+  display: inline-block;
+}
+
+.course-item {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid var(--line);
+}
+
+.course-item:last-child { border-bottom: none; }
+
+.course-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  margin-right: 18rpx;
+  flex-shrink: 0;
+}
+
+.dot-active { background: var(--success); }
+.dot-ended { background: var(--danger); }
+
+.course-detail { flex: 1; min-width: 0; }
+
+.course-name {
+  font-size: 30rpx;
+  font-weight: 650;
+  color: var(--ink);
+  margin-bottom: 6rpx;
+}
+
+.course-day {
+  font-size: 25rpx;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 6rpx;
+}
+
+.course-time-row,
+.course-loc-row {
+  font-size: 24rpx;
+  color: var(--ink-3);
+  margin-bottom: 4rpx;
+  display: flex;
+  align-items: center;
+}
+
+.course-tag {
+  font-size: 22rpx;
+  font-weight: 550;
+  padding: 6rpx 16rpx;
+  border-radius: 999px;
+  flex-shrink: 0;
+  margin-left: 12rpx;
+}
+
+.tag-active {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.tag-ended {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.request-detail { padding-top: 8rpx; }
+
+.expired-tip {
+  font-size: 25rpx;
+  color: var(--ink-3);
+  text-align: center;
+  padding: 14rpx 0 4rpx;
+}
+
+.pending-tip {
+  font-size: 25rpx;
+  color: var(--warning);
+  background: var(--warning-bg);
+  border-radius: var(--r-ctrl);
+  padding: 14rpx 20rpx;
+  margin-top: 8rpx;
+}
+
+.login-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16rpx 0;
+}
+
+.prompt-ic {
+  width: 64rpx;
+  height: 64rpx;
+  margin-bottom: 16rpx;
+}
+
+.prompt-text {
+  font-size: 27rpx;
+  color: var(--ink-2);
+  margin-bottom: 24rpx;
+}
+
+.prompt-btn {
+  width: 60% !important;
+  height: 80rpx !important;
+  line-height: 80rpx !important;
+  border-radius: 999px !important;
+  font-size: 30rpx !important;
+}
+
+.contact-section { margin-bottom: 40rpx; }
+
+.tip-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 20rpx;
+  margin: 20rpx 24rpx 0;
+  background: var(--surface);
+  border: 1rpx solid var(--line);
+  border-radius: var(--r-card);
+  padding: 26rpx;
+  box-shadow: var(--shadow-1);
+}
+
+.tip-ic-chip {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1rpx solid var(--accent-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2rpx;
+}
+
+.tip-ic {
+  width: 30rpx;
+  height: 30rpx;
+}
+
+.tip-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.tip-label {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 2rpx;
+  margin-bottom: 8rpx;
+}
+
+.tip-text {
+  font-size: 26rpx;
+  color: var(--ink-2);
+  line-height: 1.7;
+}

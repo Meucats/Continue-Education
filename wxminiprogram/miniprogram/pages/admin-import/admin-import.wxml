@@ -1,0 +1,96 @@
+<view class="import-container m-page-enter">
+  <view class="page-title">批量导入学员</view>
+
+  <!-- 导入说明 -->
+  <view class="notice-card card">
+    <view class="notice-title">导入说明</view>
+    <view class="notice-content">
+      <text>1. 请先下载Excel模板</text>
+      <text>2. 按模板格式填写学员信息</text>
+      <text>3. 选择本地Excel文件</text>
+      <text>4. 点击"开始导入"按钮</text>
+      <text class="notice-tip">系统会根据上课时间段中的星期几和课程开始/结束日期自动生成每节课的具体日期</text>
+    </view>
+    <button class="btn-secondary download-btn" bindtap="downloadTemplate" disabled="{{downloading}}">
+      {{downloading ? '生成中...' : '下载Excel模板'}}
+    </button>
+  </view>
+
+  <!-- 上传区域 -->
+  <view class="upload-card card">
+    <view class="upload-area" bindtap="chooseFile">
+      <view class="upload-icon"></view>
+      <view class="upload-text">{{fileName || '点击选择本地Excel文件'}}</view>
+      <view class="upload-hint">支持 .xlsx, .xls 格式，从手机/电脑选择文件</view>
+    </view>
+
+    <!-- 已选文件信息 -->
+    <view class="selected-file" wx:if="{{fileName}}">
+      <view class="file-info">
+        <view class="file-icon-ic ic ic-b-clip"></view>
+        <text class="file-name">{{fileName}}</text>
+      </view>
+    </view>
+
+    <button class="btn-primary import-btn" bindtap="onImport" disabled="{{!fileName || importing}}">
+      {{importing ? '导入中...' : '确认导入'}}
+    </button>
+  </view>
+
+  <!-- 导入结果 -->
+  <view class="result-card card" wx:if="{{importResult}}">
+    <view class="result-title">导入结果</view>
+    <view class="result-content">
+      <view class="result-row">
+        <text class="result-label">导入总数：</text>
+        <text class="result-value">{{importResult.total || 0}} 条</text>
+      </view>
+      <view class="result-row">
+        <text class="result-label">成功新增：</text>
+        <text class="result-value success">{{importResult.added || 0}} 条</text>
+      </view>
+      <view class="result-row">
+        <text class="result-label">成功更新：</text>
+        <text class="result-value success">{{importResult.updated || 0}} 条</text>
+      </view>
+      <view class="result-row">
+        <text class="result-label">失败数量：</text>
+        <text class="result-value danger">{{importResult.failed || 0}} 条</text>
+      </view>
+    </view>
+    <view class="error-list" wx:if="{{importResult.errors && importResult.errors.length > 0}}">
+      <view class="error-title">错误详情：</view>
+      <view class="error-item" wx:for="{{importResult.errors}}" wx:key="index">
+        <text>{{item}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- Excel模板格式说明 -->
+  <view class="template-info card">
+    <view class="info-title">Excel模板格式（8列）</view>
+    <view class="table-container">
+      <view class="table-header">
+        <text class="col">姓名</text>
+        <text class="col">联系电话</text>
+        <text class="col">班级名称</text>
+        <text class="col">上课时间段</text>
+        <text class="col">课程开始</text>
+        <text class="col">课程结束</text>
+        <text class="col">截止时间</text>
+        <text class="col">上课地点</text>
+      </view>
+      <view class="table-row">
+        <text class="col">张三</text>
+        <text class="col">138****0001</text>
+        <text class="col">计算机基础班</text>
+        <text class="col">周一上午9:00-11:00</text>
+        <text class="col">2026-09-01</text>
+        <text class="col">2026-12-31</text>
+        <text class="col">2026-12-31</text>
+        <text class="col">教学楼301</text>
+      </view>
+    </view>
+    <view class="template-tip">根据"上课时间段"中的星期几和"课程开始/结束日期"，系统自动计算每节课的具体日期</view>
+  </view>
+</view>

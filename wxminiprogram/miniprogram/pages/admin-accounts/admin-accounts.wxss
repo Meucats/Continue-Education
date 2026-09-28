@@ -1,0 +1,128 @@
+.accounts-container {
+  padding: 20rpx;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.accounts-container .page-title {
+  margin-bottom: 20rpx;
+}
+
+.notice-card {
+  padding: 25rpx;
+  margin-bottom: 20rpx;
+  background: var(--accent-soft);
+  border: 1rpx solid var(--accent-line);
+}
+
+.notice-text {
+  font-size: 25rpx;
+  color: var(--ink-2);
+  line-height: 1.65;
+}
+
+.search-box {
+  padding: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.search-input {
+  font-size: 28rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  border: 2rpx solid var(--line);
+  border-radius: var(--r-ctrl);
+  padding: 0 22rpx;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.stats-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  padding: 10rpx;
+  margin-bottom: 15rpx;
+}
+
+.stats-text {
+  font-size: 26rpx;
+  color: var(--ink-3);
+}
+
+.export-btn {
+  font-size: 25rpx;
+  font-weight: 550;
+  color: var(--accent);
+  padding: 12rpx 22rpx;
+  min-height: 64rpx;
+  border: 2rpx solid var(--accent-line);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.account-card {
+  padding: 26rpx;
+  margin-bottom: 16rpx;
+}
+
+.account-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14rpx;
+}
+
+.account-name {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.account-role {
+  font-size: 22rpx;
+  font-weight: 550;
+  padding: 6rpx 18rpx;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.admin-role {
+  background-color: var(--accent-soft);
+  color: var(--accent);
+}
+
+.student-role {
+  background-color: var(--success-bg);
+  color: var(--success);
+}
+
+.account-info {
+  padding-top: 12rpx;
+  border-top: 1rpx solid var(--line);
+}
+
+.account-info .info-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8rpx;
+  gap: 16rpx;
+}
+
+.account-info .info-label {
+  font-size: 25rpx;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+
+.account-info .info-value {
+  font-size: 25rpx;
+  color: var(--ink);
+  text-align: right;
+  word-break: break-all;
+}

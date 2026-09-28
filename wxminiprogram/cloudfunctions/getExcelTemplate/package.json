@@ -1,0 +1,10 @@
+{
+  "name": "getExcelTemplate",
+  "version": "1.0.0",
+  "description": "生成Excel导入模板",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3",
+    "xlsx": "^0.18.5"
+  }
+}

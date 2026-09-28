@@ -1,177 +1,67 @@
-# 杭职大继续教育学院 - 管理后台部署指南
+# Web 管理后台（webadmin）
 
-## 项目说明
+进校系统的 Web 管理端，**同一套业务逻辑的两种部署形态**，均不直接读写数据库，全部通过云函数 `adminApi` 完成登录与数据操作：
 
-本项目为杭职大继续教育学院进校系统的Web管理后台，基于微信云开发 + Vercel Serverless 部署。
-
-## 一、环境准备
-
-### 1. 注册必要账号
-| 平台 | 用途 | 网址 |
+| 目录 | 形态 | 说明 |
 |------|------|------|
-| 微信公众平台 | 小程序管理 | https://mp.weixin.qq.com |
-| Vercel | 后台托管 | https://vercel.com |
-| GitHub（推荐） | 代码托管+自动部署 | https://github.com |
-| Node.js | 本地开发 | https://nodejs.org |
+| `admin-server/` | Node + Express | 腾讯云服务器 / 本机 / 局域网主用，`pm2` 常驻 |
+| `cloudflare/` | Cloudflare Workers | 备用站点，`wrangler deploy` 发布 |
 
-### 2. 安装工具
-```bash
-# 安装 Vercel CLI
-npm install -g vercel
+## 统一鉴权模型（三端一致）
 
-# 安装 Git（如未安装）
-# Windows 下载：https://git-scm.com/download/win
-```
+1. 服务端调用云函数时携带 `secret`，云函数校验它与环境变量 `ADMIN_API_SECRET` 是否一致；**未配置则全部失败（fail-closed）**。
+2. 浏览器侧不保存任何密码，只保存云函数签发的 **7 天随机 token**（`sessions` 集合），改密后全部撤销。
+3. 管理员密码在库里是 **scrypt 加盐哈希**（`scrypt$salt$hash`），登录时自动把旧明文数据重哈希。
+4. 登录限速：同账号 10 分钟内失败 5 次 → 锁 10 分钟。
+5. 首次登录 `admin/admin123` 会被**强制修改密码**（不可跳过，只能退出登录）。
+6. 超级管理员才能增删管理员、导入管理员账号；普通管理员只能看被分配的班级。
 
-## 二、获取 appSecret
+三处 `ADMIN_API_SECRET` 必须完全一致：
 
-1. 登录 https://mp.weixin.qq.com
-2. 左侧菜单 → 开发 → 开发管理 → 开发设置
-3. 找到「AppSecret」，点击「重置」获取
-4. **务必保存好，只显示一次**
+- 云函数 `adminApi` → 环境变量 `ADMIN_API_SECRET`
+- Cloudflare → `npx wrangler secret put ADMIN_API_SECRET`
+- admin-server → `config.json` 的 `adminApiSecret`
 
-## 三、本地测试
+## admin-server（腾讯云 / 本机）
 
-```bash
-cd vercel-admin
+```powershell
+cd webadmin/admin-server
+copy config.example.json config.json   # 填 appSecret 与 adminApiSecret
 npm install
-vercel dev
+node server.js                          # 或 start.ps1 / 启动管理后台.bat
 ```
 
-浏览器打开 http://localhost:3000 测试功能是否正常。
+上线用 `pm2 start server.js --name admin-api`。浏览器打开 `http://IP:3000`。
 
-## 四、部署到 Vercel
+- 接口前缀 `/api`（前端相对路径，本机与云上通用）
+- 登录签发本地 HMAC token（含角色、`iat`），改密后旧 token 立即失效
+- 上传用 `multer` 存 `uploads/`，临时文件用完即删；`data/`、`uploads/`、`config.json`、`.token-secret` 均在 `.gitignore` 中
 
-### 方式一：通过 CLI 部署
+完整步骤见根目录 [`部署指南.md`](../部署指南.md) 与 [`腾讯云部署教程.md`](../腾讯云部署教程.md)。
 
-```bash
-cd vercel-admin
+## Cloudflare Workers（备用）
 
-# 首次登录
-vercel login
-
-# 部署（按提示操作）
-vercel
-
-# 部署到生产环境
-vercel --prod
+```powershell
+powershell -ExecutionPolicy Bypass -File "webadmin\cloudflare\deploy.ps1"
 ```
 
-### 方式二：通过 GitHub 自动部署（推荐）
+脚本依次：`npm install` → `wrangler login` → 创建 KV → `secret put WX_APP_SECRET` → `secret put ADMIN_API_SECRET` → `wrangler deploy`。手动命令见 [`DEPLOY.md`](./cloudflare/DEPLOY.md)。
 
-#### 步骤 1：创建 GitHub 仓库
-1. 登录 https://github.com
-2. 点击右上角「+」→「New repository」
-3. 仓库名填 `vercel-admin`
-4. 选择 Public 或 Private
-5. 点击「Create repository」
+- 同源策略：只允许自身域名的跨域请求
+- 登录失败限速按 `CF-Connecting-IP` 计
+- 免费额度每天 10 万次请求，校园管理场景足够
 
-#### 步骤 2：上传代码
-```bash
-cd vercel-admin
-git init
-git add .
-git commit -m "初始部署"
-git remote add origin https://github.com/你的用户名/vercel-admin.git
-git push -u origin main
-```
+## 功能清单
 
-#### 步骤 3：Vercel 关联 GitHub
-1. 登录 https://vercel.com
-2. 点击「Add New...」→「Project」
-3. 选择「Import Git Repository」
-4. 选择刚才创建的 `vercel-admin` 仓库
-5. 点击「Import」
+仪表盘统计、学员管理（增删改查/重置密码/批量删除/Excel 导入导出）、入校申请审批、账户管理（学员账号同步）、班级管理、管理员账号（超管）、登录日志、温馨提示（按班级）。
 
-#### 步骤 4：配置环境变量
-在 Vercel 项目设置 → Settings → Environment Variables 中添加：
+导出与模板下载走带 `Authorization` 的 blob 下载；表格中的姓名、身份证等用户输入在渲染时统一转义，身份证列表默认脱敏。
 
-| 变量名 | 值 | 说明 |
-|--------|-----|------|
-| `WX_ENV` | `cloud1-d6gio7v8iff39bab7` | 云开发环境ID |
-| `WX_APPID` | `wxcde7f3fd1d5fc715` | 小程序AppID |
-| `WX_APPSECRET` | （你的appSecret） | 小程序AppSecret |
+## 常见问题
 
-#### 步骤 5：部署
-- 点击「Deploy」按钮
-- 等待部署完成（约1-2分钟）
-- 部署成功后会分配一个域名如 `xxx.vercel.app`
-
-#### 步骤 6：后续更新
-以后修改代码后，只需：
-```bash
-git add .
-git commit -m "修改说明"
-git push
-```
-Vercel 会**自动检测代码变化并重新部署**，无需手动操作。
-
-## 五、绑定自定义域名（可选）
-
-1. 在域名服务商购买域名
-2. Vercel 项目 → Settings → Domains
-3. 输入你的域名，按提示添加 DNS 记录
-4. 等待生效（通常几分钟）
-
-## 六、常见问题
-
-### Q: 环境变量在哪里配置？
-A: Vercel 控制台 → 你的项目 → Settings → Environment Variables
-
-### Q: 部署后数据会丢吗？
-A: 不会。数据存在微信云数据库，Vercel 只是托管前端页面和API逻辑。
-
-### Q: 免费额度够用吗？
-A: Vercel 免费版支持：
-- 每月 100GB 流量
-- 无限次部署
-- 无限个域名
-对于学校管理系统完全够用。
-
-### Q: 小程序端需要改吗？
-A: 不需要。小程序端直接调用云函数，不经过 Vercel。
-
-### Q: 本地还能用吗？
-A: 可以。运行 `vercel dev` 启动本地开发服务器，和之前 `node server.js` 效果一样。
-
-## 七、项目结构
-
-```
-vercel-admin/
-├── api/                    # Vercel Serverless Functions
-│   ├── _lib/
-│   │   └── cloud.js        # 公共工具（云函数调用、Excel解析等）
-│   ├── admin/
-│   │   ├── login.js        # 管理员登录
-│   │   ├── index.js        # 管理员列表/添加
-│   │   └── [id].js         # 管理员编辑/删除
-│   ├── students.js         # 学员列表/添加
-│   ├── students/
-│   │   ├── [id].js         # 学员编辑/删除
-│   │   └── batch-delete.js # 批量删除
-│   ├── import.js           # Excel导入
-│   ├── requests.js         # 入校申请列表
-│   ├── requests/
-│   │   └── [id]/
-│   │       ├── approve.js  # 审批通过
-│   │       └── reject.js   # 审批拒绝
-│   ├── accounts.js         # 账户列表
-│   ├── accounts/
-│   │   └── sync.js         # 账户同步
-│   ├── stats.js            # 统计数据
-│   ├── stats/
-│   │   └── detail.js       # 详细统计
-│   ├── export/
-│   │   └── students.js     # 导出Excel
-│   └── template/
-│       └── download.js     # 下载模板
-├── public/                 # 静态文件
-│   └── index.html          # 管理后台页面
-├── vercel.json             # Vercel 配置
-├── package.json            # 依赖配置
-└── .env.example            # 环境变量示例
-```
-
-## 八、技术支持
-
-如有问题，请联系项目开发者。
+| 现象 | 处理 |
+|------|------|
+| 登录提示「云函数调用失败」 | 三端 `ADMIN_API_SECRET` 是否一致；云函数是否已上传 |
+| 部署后打开是旧页面 | Workers 重新 `wrangler deploy`；服务器 `pm2 restart admin-api` |
+| 端口 3000 被占用 | 改 `server.js` 末尾 `PORT`，安全组同步放行 |
+| 忘记管理员密码 | 超管在「账户管理」重置；库中无超管时用初始账号 `admin/admin123`（仅当 `admins` 集合为空时可用，登录后强制改密） |

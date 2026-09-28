@@ -1,0 +1,43 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/schedule/schedule",
+    "pages/mine/mine",
+    "pages/login/login",
+    "pages/consult/consult",
+    "pages/admin/admin",
+    "pages/admin-students/admin-students",
+    "pages/admin-add/admin-add",
+    "pages/admin-import/admin-import",
+    "pages/admin-requests/admin-requests",
+    "pages/admin-accounts/admin-accounts"
+  ],
+  "window": {
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#1558C7",
+    "navigationBarTitleText": "杭职大继教院进校系统",
+    "navigationBarTextStyle": "white"
+  },
+  "tabBar": {
+    "color": "#6B7482",
+    "selectedColor": "#1558C7",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/schedule/schedule",
+        "text": "课表"
+      },
+      {
+        "pagePath": "pages/mine/mine",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

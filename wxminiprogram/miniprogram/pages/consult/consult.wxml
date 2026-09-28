@@ -1,0 +1,141 @@
+<view class="consult-container m-page-enter">
+  <view class="page-title">咨询进校申请</view>
+
+  <view class="form-card card m-enter">
+    <view class="input-group">
+      <view class="input-label">姓名 <text class="required">*</text></view>
+      <input class="input-field" placeholder="请输入您的姓名" placeholder-class="ph" value="{{name}}" bindinput="onNameInput" />
+    </view>
+
+    <view class="input-group">
+      <view class="input-label">联系电话 <text class="required">*</text></view>
+      <input class="input-field" type="number" maxlength="11" placeholder="请输入手机号码" placeholder-class="ph" value="{{phone}}" bindinput="onPhoneInput" />
+    </view>
+
+    <view class="input-group">
+      <view class="input-label">车牌号 <text class="optional">（选填）</text></view>
+      <input class="input-field" placeholder="请输入车牌号（如开车来校）" placeholder-class="ph" value="{{carPlate}}" bindinput="onCarPlateInput" />
+    </view>
+
+    <view class="input-group">
+      <view class="input-label">进校日期 <text class="required">*</text></view>
+      <picker mode="date" value="{{entryDate}}" bindchange="onDateChange" start="{{entryDate}}">
+        <view class="input-field picker-field">
+          <text class="{{entryDate ? 'pv-on' : 'pv-off'}}">{{entryDate || '请选择进校日期'}}</text>
+          <view class="picker-arrow ic ic-g-cal"></view>
+        </view>
+      </picker>
+    </view>
+
+    <view class="time-row">
+      <view class="input-group time-group">
+        <view class="input-label">开始时间 <text class="required">*</text></view>
+        <picker mode="time" value="{{entryStartTime}}" bindchange="onStartTimeChange">
+          <view class="input-field picker-field">
+            <text class="{{entryStartTime ? 'pv-on' : 'pv-off'}}">{{entryStartTime || '开始'}}</text>
+            <view class="picker-arrow ic ic-g-clock"></view>
+          </view>
+        </picker>
+      </view>
+      <view class="time-separator">至</view>
+      <view class="input-group time-group">
+        <view class="input-label">结束时间 <text class="required">*</text></view>
+        <picker mode="time" value="{{entryEndTime}}" bindchange="onEndTimeChange">
+          <view class="input-field picker-field">
+            <text class="{{entryEndTime ? 'pv-on' : 'pv-off'}}">{{entryEndTime || '结束'}}</text>
+            <view class="picker-arrow ic ic-g-clock"></view>
+          </view>
+        </picker>
+      </view>
+    </view>
+
+    <button class="btn-primary submit-btn" bindtap="onSubmit" disabled="{{submitting}}">
+      {{submitting ? '提交中...' : '提交申请'}}
+    </button>
+  </view>
+
+  <view class="status-section" wx:if="{{existingRequest}}">
+    <view class="status-card card">
+      <view class="status-header">
+        <text class="status-title">当前申请状态</text>
+        <text class="tag tag-expired" wx:if="{{isExpired}}">已过期</text>
+        <text class="tag tag-pending" wx:elif="{{existingRequest.status === 'pending'}}">审核中</text>
+        <text class="tag tag-approved" wx:elif="{{existingRequest.status === 'approved'}}">已通过</text>
+        <text class="tag tag-rejected" wx:elif="{{existingRequest.status === 'rejected'}}">已拒绝</text>
+      </view>
+
+      <view class="status-info" wx:if="{{existingRequest.status === 'approved' && !isExpired}}">
+        <view class="result-text approved-text">恭喜您！您的进校申请已通过</view>
+        <view class="i-row">
+          <text class="i-k">进校日期</text>
+          <text class="i-v num">{{existingRequest.entryDate}}</text>
+        </view>
+        <view class="i-row">
+          <text class="i-k">有效时段</text>
+          <text class="i-v num">{{existingRequest.entryStartTime}} - {{existingRequest.entryEndTime}}</text>
+        </view>
+        <view class="i-row">
+          <text class="i-k">咨询地点</text>
+          <text class="i-v">继教院 3406 办公室</text>
+        </view>
+        <view class="i-row">
+          <text class="i-k">联系电话</text>
+          <text class="i-v num">56700015</text>
+        </view>
+      </view>
+
+      <view class="status-info" wx:if="{{existingRequest.status === 'approved' && isExpired}}">
+        <view class="result-text expired-text">您的进校申请已过期</view>
+        <view class="i-row">
+          <text class="i-k">进校日期</text>
+          <text class="i-v num">{{existingRequest.entryDate}}</text>
+        </view>
+        <view class="i-row">
+          <text class="i-k">有效时段</text>
+          <text class="i-v num">{{existingRequest.entryStartTime}} - {{existingRequest.entryEndTime}}</text>
+        </view>
+        <view class="expired-tip">如需再次进校，请重新提交申请</view>
+      </view>
+
+      <view class="status-info" wx:if="{{existingRequest.status === 'rejected'}}">
+        <view class="result-text rejected-text">很抱歉，您的进校申请未通过</view>
+        <view class="i-row">
+          <text class="i-k">原因</text>
+          <text class="i-v">{{existingRequest.rejectReason || '未说明原因'}}</text>
+        </view>
+      </view>
+
+      <view class="status-info" wx:if="{{existingRequest.status === 'pending'}}">
+        <view class="result-text pending-text">您的申请正在审核中，请耐心等待</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="history-section" wx:if="{{historyRequests.length > 0}}">
+    <view class="history-title">
+      <view class="ic ic-g-clipboard ht-ic"></view>
+      历史申请记录
+    </view>
+    <view class="history-list m-stagger">
+      <view class="history-item card" wx:for="{{historyRequests}}" wx:key="_id">
+        <view class="history-header">
+          <text class="history-date num">{{item.entryDate || item.createdAt}}</text>
+          <text class="tag tag-small tag-expired" wx:if="{{item.isExpired}}">已过期</text>
+          <text class="tag tag-small tag-pending" wx:elif="{{item.status === 'pending'}}">审核中</text>
+          <text class="tag tag-small tag-approved" wx:elif="{{item.status === 'approved'}}">已通过</text>
+          <text class="tag tag-small tag-rejected" wx:elif="{{item.status === 'rejected'}}">已拒绝</text>
+        </view>
+        <view class="history-info" wx:if="{{item.entryStartTime}}">
+          <text class="history-time num">时段：{{item.entryStartTime}} - {{item.entryEndTime}}</text>
+        </view>
+        <view class="history-info" wx:if="{{item.rejectReason}}">
+          <text class="history-reason">拒绝原因：{{item.rejectReason}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="back-btn" bindtap="goBack">
+    <text>返回首页</text>
+  </view>
+</view>

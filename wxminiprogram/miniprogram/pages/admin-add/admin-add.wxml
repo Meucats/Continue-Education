@@ -1,0 +1,78 @@
+<view class="add-container m-page-enter">
+  <view class="page-title">{{isEdit ? '编辑学员' : '添加学员'}}</view>
+
+  <view class="form-card card">
+    <view class="input-group">
+      <view class="input-label">姓名 <text class="required">*</text></view>
+      <input class="input-field" placeholder="请输入学员姓名" value="{{formData.name}}" bindinput="onInput" data-field="name" />
+    </view>
+
+    <view class="input-group">
+      <view class="input-label">联系电话 <text class="required">*</text></view>
+      <input class="input-field" type="number" maxlength="11" placeholder="请输入手机号码" value="{{formData.phone}}" bindinput="onInput" data-field="phone" />
+    </view>
+
+    <view class="input-group">
+      <view class="input-label">身份证号码</view>
+      <input class="input-field" placeholder="请输入身份证号码" value="{{formData.idCard}}" bindinput="onInput" data-field="idCard" />
+    </view>
+
+    <view class="input-group">
+      <view class="input-label">公司名称</view>
+      <input class="input-field" placeholder="请输入公司名称" value="{{formData.company}}" bindinput="onInput" data-field="company" />
+    </view>
+
+    <view class="input-group">
+      <view class="input-label">班级名称 <text class="required">*</text></view>
+      <input class="input-field" placeholder="请输入班级名称" value="{{formData.className}}" bindinput="onInput" data-field="className" />
+    </view>
+
+    <view class="input-group">
+      <view class="input-label">上课时间段 <text class="required">*</text></view>
+      <input class="input-field" placeholder="多个时间段用逗号分隔，如：周一上午 9:00-11:00, 周三下午 14:00-16:00" value="{{formData.schedule}}" bindinput="onInput" data-field="schedule" />
+    </view>
+
+    <view class="input-group">
+      <view class="input-label">课程开始日期 <text class="required">*</text></view>
+      <picker mode="date" value="{{formData.courseStartDate}}" bindchange="onCourseStartDateChange">
+        <view class="picker-field">{{formData.courseStartDate || '请选择开始日期'}}</view>
+      </picker>
+    </view>
+
+    <view class="input-group">
+      <view class="input-label">课程结束日期 <text class="required">*</text></view>
+      <picker mode="date" value="{{formData.courseEndDate}}" bindchange="onCourseEndDateChange">
+        <view class="picker-field">{{formData.courseEndDate || '请选择结束日期'}}</view>
+      </picker>
+    </view>
+
+    <view class="input-group">
+      <view class="input-label">上课截止时间 <text class="required">*</text></view>
+      <picker mode="date" value="{{formData.deadline}}" bindchange="onDeadlineChange">
+        <view class="picker-field">{{formData.deadline || '请选择截止日期'}}</view>
+      </picker>
+    </view>
+
+    <view class="input-group">
+      <view class="input-label">上课地点 <text class="required">*</text></view>
+      <input class="input-field" placeholder="请输入上课地点" value="{{formData.location}}" bindinput="onInput" data-field="location" />
+    </view>
+
+    <!-- 自动生成的上课日期预览 -->
+    <view class="input-group" wx:if="{{generatedDates.length > 0}}">
+      <view class="input-label">自动排课预览（共{{generatedDates.length}}节）</view>
+      <view class="dates-preview">
+        <view class="date-preview-item" wx:for="{{generatedDates}}" wx:key="date">
+          <text class="dp-date">{{item.date}}</text>
+          <text class="dp-time">{{item.timeSlot}}</text>
+        </view>
+      </view>
+    </view>
+
+    <button class="btn-primary submit-btn" bindtap="onSubmit" disabled="{{submitting}}">
+      {{submitting ? '保存中...' : '保存'}}
+    </button>
+
+    <button class="btn-secondary cancel-btn" bindtap="onCancel">取消</button>
+  </view>
+</view>

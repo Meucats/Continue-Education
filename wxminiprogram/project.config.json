@@ -1,0 +1,57 @@
+{
+  "miniprogramRoot": "miniprogram/",
+  "cloudbaseRoot": "",
+  "cloudfunctionRoot": "cloudfunctions/",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "preloadBackgroundData": false,
+    "minified": true,
+    "newFeature": true,
+    "coverView": true,
+    "nodeModules": true,
+    "autoAudits": false,
+    "showShadowRootInWxmlPanel": true,
+    "scopeDataCheck": false,
+    "uglifyFileName": false,
+    "checkInvalidKey": true,
+    "checkSiteMap": true,
+    "uploadWithSourceMap": true,
+    "compileHotReLoad": false,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
+    "compileWorklet": false,
+    "packNpmManually": true,
+    "packNpmRelationList": [
+      {
+        "packageJsonPath": "cloudfunctions/adminApi/package.json",
+        "miniprogramNpmDistDir": "miniprogram"
+      }
+    ],
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false
+  },
+  "appid": "wxcde7f3fd1d5fc715",
+  "projectname": "hgd-edu-system",
+  "libVersion": "2.25.0",
+  "cloudfunctionTemplateRoot": "",
+  "cloudfunctionTemplateEnv": "cloud1-d6gio7v8iff39bab7",
+  "condition": {},
+  "description": "杭职大继续教育学院进校系统",
+  "compileType": "miniprogram",
+  "simulatorPluginLibVersion": {},
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "editorSetting": {}
+}

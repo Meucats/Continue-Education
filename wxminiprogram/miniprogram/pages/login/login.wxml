@@ -1,0 +1,60 @@
+<view class="login-container m-page-enter">
+  <view class="logo-section">
+    <image class="school-logo" src="/images/school-emblem.png" mode="aspectFit" />
+    <view class="school-name">杭州职业技术大学</view>
+    <view class="college-name">继续教育学院</view>
+    <view class="system-name">进校管理系统</view>
+  </view>
+
+  <view class="login-form card m-enter m-enter-d2">
+    <view class="input-group">
+      <view class="input-label">手机号码</view>
+      <input class="input-field" type="number" maxlength="11"
+        placeholder="请输入手机号码" placeholder-class="ph" value="{{phone}}" bindinput="onPhoneInput" />
+    </view>
+
+    <view class="input-group">
+      <view class="input-label">密码</view>
+      <input class="input-field" password
+        placeholder="请输入密码" placeholder-class="ph" value="{{password}}" bindinput="onPasswordInput" />
+    </view>
+
+    <button class="btn-primary login-btn" bindtap="onLogin">登录</button>
+
+    <view class="admin-entry" bindtap="goToAdmin">
+      <text>管理后台入口</text>
+    </view>
+  </view>
+
+  <view class="footer">
+    <text>杭州职业技术大学继续教育学院</text>
+  </view>
+</view>
+
+<!-- 首次登录修改密码弹窗 -->
+<view class="modal-mask m-mask-enter" wx:if="{{showPasswordModal}}" catchtouchmove="true">
+  <view class="modal-box m-modal-enter">
+    <view class="modal-title">修改初始密码</view>
+    <view class="modal-desc">首次登录请修改密码</view>
+    <view class="modal-input-group">
+      <input class="modal-input" password placeholder="请输入原密码" placeholder-class="ph" value="{{changeOldPwd}}" bindinput="onOldPwdInput" />
+    </view>
+    <view class="modal-input-group">
+      <input class="modal-input" password placeholder="请输入新密码（至少6位）" placeholder-class="ph" value="{{changeNewPwd}}" bindinput="onNewPwdInput" />
+    </view>
+    <view class="pwd-strength" wx:if="{{changeNewPwd}}">
+      <view class="pwd-str-bar str-{{pwdStrength}}"></view>
+      <text class="pwd-str-text str-{{pwdStrength}}">{{pwdStrengthLabel}}</text>
+    </view>
+    <view class="modal-input-group">
+      <input class="modal-input" password placeholder="请再次输入新密码" placeholder-class="ph" value="{{changeConfirmPwd}}" bindinput="onConfirmPwdInput" />
+    </view>
+    <view class="pwd-match" wx:if="{{changeConfirmPwd}}">
+      <text class="{{changeNewPwd === changeConfirmPwd ? 'match-ok' : 'match-no'}}">{{changeNewPwd === changeConfirmPwd ? '密码一致' : '密码不一致'}}</text>
+    </view>
+    <view class="modal-btns">
+      <button class="modal-btn cancel" bindtap="onCancelPassword">取消</button>
+      <button class="modal-btn confirm" bindtap="onSubmitPassword">确认修改</button>
+    </view>
+  </view>
+</view>

@@ -1633,9 +1633,9 @@
                 <div class="login-options">
                     <label class="remember-me">
                         <input type="checkbox" id="rememberPwd">
-                        <span>记住密码</span>
+                        <span>记住账号</span>
                     </label>
-                    <span class="remember-hint">仅保存在本机浏览器</span>
+                    <span class="remember-hint">仅记住账号，密码不保存在本机</span>
                 </div>
                 <button class="btn btn-primary btn-block" onclick="doLogin()">登 录</button>
             </div>
@@ -1787,7 +1787,7 @@
                             <div class="action-icon"><svg class="ico"><use href="#i-clipboard"/></svg></div>
                             <div class="action-text">审批申请</div>
                         </div>
-                        <div class="action-card" onclick="window.open('/api/export/students')">
+                        <div class="action-card" onclick="downloadWithAuth('/api/export/students','学员信息.xlsx')">
                             <div class="action-icon"><svg class="ico"><use href="#i-download"/></svg></div>
                             <div class="action-text">导出数据</div>
                         </div>
@@ -1844,7 +1844,7 @@
                         <div class="toolbar-group">
                             <button class="btn btn-primary btn-sm" onclick="showAddStudentModal()"><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加学员</button>
                             <button class="btn btn-danger btn-sm" onclick="batchDeleteStudents()"><svg class="ico ico-sm"><use href="#i-trash"/></svg>批量删除</button>
-                            <a href="/api/export/students" class="btn btn-secondary btn-sm"><svg class="ico ico-sm"><use href="#i-download"/></svg>导出 Excel</a>
+                            <a href="/api/export/students" class="btn btn-secondary btn-sm" onclick="downloadWithAuth('/api/export/students','学员信息.xlsx');return false;"><svg class="ico ico-sm"><use href="#i-download"/></svg>导出 Excel</a>
                         </div>
                     </div>
                     <div class="table-container">
@@ -2021,7 +2021,7 @@
                 <div class="info-banner">
                     <span class="banner-icon"><svg class="ico"><use href="#i-info"/></svg></span>
                     <div>
-                        学员首次用手机号登录小程序时，系统会自动创建账户。密码默认为手机号后6位。
+                        学员初始密码为身份证后6位（无身份证时为手机后6位），密码仅以哈希形式存储，可在学员管理中重置。
                     </div>
                 </div>
                 <div class="card">
@@ -2035,7 +2035,6 @@
                                 <tr>
                                     <th>姓名</th>
                                     <th>手机号</th>
-                                    <th>密码</th>
                                     <th>角色</th>
                                     <th>创建时间</th>
                                 </tr>
@@ -2148,6 +2147,37 @@
     </div>
 </div>
 
+<!-- ==================== 首次登录强制修改密码 ==================== -->
+<div id="forcePwdModal" class="modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal-header">
+            <div class="modal-title">首次登录请修改初始密码</div>
+        </div>
+        <div class="modal-body">
+            <div class="info-banner" style="margin-bottom:16px;">
+                <span class="banner-icon"><svg class="ico"><use href="#i-info"/></svg></span>
+                <div>为保障账号安全，初始密码必须修改后才能使用系统。新密码至少 8 位。</div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">原密码 <span class="required">*</span></label>
+                <input type="password" id="forceOldPwd" class="form-input" autocomplete="current-password" placeholder="请输入原密码">
+            </div>
+            <div class="form-group">
+                <label class="form-label">新密码 <span class="required">*</span></label>
+                <input type="password" id="forceNewPwd" class="form-input" autocomplete="new-password" placeholder="至少 8 位">
+            </div>
+            <div class="form-group">
+                <label class="form-label">确认新密码 <span class="required">*</span></label>
+                <input type="password" id="forceConfirmPwd" class="form-input" autocomplete="new-password" placeholder="请再次输入新密码">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="doLogout()">退出登录</button>
+            <button class="btn btn-primary" onclick="submitForcePasswordChange()">确认修改</button>
+        </div>
+    </div>
+</div>
+
 <!-- ==================== 管理员模态框 ==================== -->
 <div id="adminModal" class="modal-overlay">
     <div class="modal" role="dialog" aria-modal="true">
@@ -2254,6 +2284,21 @@
 const API_BASE = '/api';
 let allStudents = [];
 let pendingCount = 0;
+
+// ============ 安全工具：HTML 转义 / 脱敏 ============
+function escapeHtml(v) {
+    if (v === undefined || v === null) return '';
+    return String(v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function maskIdCard(v) {
+    const s = String(v || '');
+    if (s.length < 9) return s || '-';
+    return s.slice(0, 3) + '***********' + s.slice(-4);
+}
+// 行数据注册表：避免把用户数据拼进 onclick 字符串
+const rowStore = { tips: {}, admins: {} };
 
 // ============ 动效基座（taste + GSAP + Lenis，标准同步与 cleanup） ============
 const Motion = (() => {
@@ -2391,12 +2436,12 @@ function applyRemembered() {
     const rememberEl = document.getElementById('rememberPwd');
     if (remembered && remembered.phone) {
         document.getElementById('loginPhone').value = remembered.phone || '';
-        if (remembered.password) document.getElementById('loginPassword').value = remembered.password;
         if (rememberEl) rememberEl.checked = true;
     }
 }
-function saveRemembered(phone, password) {
-    localStorage.setItem('adminRemember', JSON.stringify({ phone, password }));
+// 仅记住账号，不保存密码
+function saveRemembered(phone) {
+    localStorage.setItem('adminRemember', JSON.stringify({ phone }));
 }
 function clearRemembered() { localStorage.removeItem('adminRemember'); }
 
@@ -2416,6 +2461,24 @@ function apiFetch(url, options = {}) {
     });
 }
 
+// 带鉴权的文件下载（<a href> 无法携带 Authorization）
+function downloadWithAuth(url, filename) {
+    apiFetch(url).then(r => {
+        if (!r.ok) { showToast('导出失败，请重新登录', 'error'); return null; }
+        return r.blob();
+    }).then(blob => {
+        if (!blob) return;
+        const a = document.createElement('a');
+        const href = URL.createObjectURL(blob);
+        a.href = href;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(href), 3000);
+    }).catch(() => showToast('导出失败', 'error'));
+}
+
 function enterAdmin(data) {
     currentAdminRole = data.role || 'admin';
     closeSidebar();
@@ -2424,8 +2487,49 @@ function enterAdmin(data) {
     document.getElementById('adminAvatar').textContent = (data.name || '管').charAt(0);
     document.getElementById('adminNameDisplay').textContent = data.name || '管理员';
     applyRolePermission();
+    if (data.mustChangePassword) {
+        showForcePasswordChange();
+        return;
+    }
+    document.getElementById('forcePwdModal').classList.remove('show');
     loadDashboard();
     requestAnimationFrame(() => Motion.adminEntrance());
+}
+
+// ============ 首次登录强制改密 ============
+function showForcePasswordChange() {
+    ['forceOldPwd', 'forceNewPwd', 'forceConfirmPwd'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    document.getElementById('forcePwdModal').classList.add('show');
+}
+
+function submitForcePasswordChange() {
+    const oldPassword = document.getElementById('forceOldPwd').value;
+    const newPassword = document.getElementById('forceNewPwd').value;
+    const confirmPwd = document.getElementById('forceConfirmPwd').value;
+    if (!oldPassword) return showToast('请输入原密码', 'error');
+    if (newPassword.length < 8) return showToast('新密码至少8位', 'error');
+    if (newPassword !== confirmPwd) return showToast('两次输入的新密码不一致', 'error');
+    apiFetch(`${API_BASE}/admin/change-password`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldPassword, newPassword })
+    }).then(r => r.json()).then(res => {
+        if (res.success) {
+            const session = getSession();
+            if (session && res.data && res.data.token) {
+                session.token = res.data.token;
+                localStorage.setItem('adminLogin', JSON.stringify(session));
+            }
+            document.getElementById('forcePwdModal').classList.remove('show');
+            showToast('密码修改成功');
+            loadDashboard();
+            requestAnimationFrame(() => Motion.adminEntrance());
+        } else {
+            showToast(res.message || '修改失败', 'error');
+        }
+    }).catch(err => showToast('修改失败：' + err.message, 'error'));
 }
 
 function doLogin() {
@@ -2447,7 +2551,7 @@ function doLogin() {
     }).then(r => r.json()).then(res => {
         if (btn) { btn.disabled = false; btn.innerHTML = btnHtml; }
         if (res.success && res.data && res.data.token) {
-            if (isRemember) saveRemembered(phone, password);
+            if (isRemember) saveRemembered(phone);
             else clearRemembered();
             localStorage.setItem('adminLogin', JSON.stringify({
                 token: res.data.token,
@@ -2478,6 +2582,7 @@ function applyRolePermission() {
 function doLogout() {
     clearSession();
     closeSidebar();
+    document.getElementById('forcePwdModal').classList.remove('show');
     document.getElementById('adminPage').classList.add('hidden');
     document.getElementById('loginPage').classList.remove('hidden');
     document.getElementById('loginPassword').value = '';
@@ -2571,7 +2676,7 @@ function loadDashboard() {
                 });
                 classContainer.innerHTML = d.classNames.map(name => `
                     <div class="class-item">
-                        <span class="class-name">${name}</span>
+                        <span class="class-name">${escapeHtml(name)}</span>
                         <span class="class-count num">${studentCounts[name] || 0} 人</span>
                     </div>
                 `).join('');
@@ -2610,21 +2715,21 @@ function renderStudents(students) {
     tbody.innerHTML = students.map(s => {
         const courseDatesCount = (s.courseDates && s.courseDates.length > 0) ? s.courseDates.length : 0;
         return `<tr>
-            <td><input type="checkbox" class="stu-check" value="${s._id}" aria-label="选择 ${s.name}"></td>
-            <td><strong>${s.name}</strong></td>
-            <td class="num">${s.phone}</td>
-            <td class="num">${s.idCard || '-'}</td>
-            <td class="cell-wrap">${s.company || '-'}</td>
-            <td class="cell-wrap">${s.className}</td>
-            <td class="cell-wrap">${s.schedule}</td>
-            <td class="cell-wrap">${s.location}</td>
-            <td class="num">${s.courseStartDate || '-'}</td>
-            <td class="num">${s.courseEndDate || '-'}</td>
-            <td class="num">${s.deadline || '-'}${courseDatesCount > 0 ? '<br><small style="color:var(--accent)">' + courseDatesCount + '节课</small>' : ''}</td>
+            <td><input type="checkbox" class="stu-check" value="${escapeHtml(s._id)}" aria-label="选择 ${escapeHtml(s.name)}"></td>
+            <td><strong>${escapeHtml(s.name)}</strong></td>
+            <td class="num">${escapeHtml(s.phone)}</td>
+            <td class="num">${maskIdCard(s.idCard)}</td>
+            <td class="cell-wrap">${escapeHtml(s.company) || '-'}</td>
+            <td class="cell-wrap">${escapeHtml(s.className)}</td>
+            <td class="cell-wrap">${escapeHtml(s.schedule)}</td>
+            <td class="cell-wrap">${escapeHtml(s.location)}</td>
+            <td class="num">${escapeHtml(s.courseStartDate) || '-'}</td>
+            <td class="num">${escapeHtml(s.courseEndDate) || '-'}</td>
+            <td class="num">${escapeHtml(s.deadline) || '-'}${courseDatesCount > 0 ? '<br><small style="color:var(--accent)">' + courseDatesCount + '节课</small>' : ''}</td>
             <td>
-                <button class="btn btn-ghost btn-sm btn-icon" onclick="editStudent('${s._id}')" title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>
-                <button class="btn btn-ghost btn-sm btn-icon" onclick="resetPassword('${s._id}','${s.name}')" title="重置密码" aria-label="重置密码">${ico('i-key','ico-sm')}</button>
-                <button class="btn btn-ghost btn-sm btn-icon" onclick="deleteStudent('${s._id}','${s.name}')" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="editStudent('${escapeHtml(s._id)}')" title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="resetPassword('${escapeHtml(s._id)}')" title="重置密码" aria-label="重置密码">${ico('i-key','ico-sm')}</button>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="deleteStudent('${escapeHtml(s._id)}')" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>
             </td>
         </tr>`;
     }).join('');
@@ -2681,7 +2786,7 @@ function previewCourseDates() {
     if (dates.length === 0) { preview.style.display = 'none'; return; }
     preview.style.display = 'block';
     preview.innerHTML = '<strong>自动排课预览（共' + dates.length + '节）</strong><br>' +
-        dates.slice(0, 10).map(d => d.date + ' ' + d.timeSlot).join('<br>') +
+        dates.slice(0, 10).map(d => escapeHtml(d.date + ' ' + d.timeSlot)).join('<br>') +
         (dates.length > 10 ? '<br>... 等共 ' + dates.length + ' 节' : '');
 }
 
@@ -2754,7 +2859,9 @@ function saveStudent() {
     }
 }
 
-function resetPassword(id, name) {
+function resetPassword(id) {
+    const s = allStudents.find(x => x._id === id);
+    const name = s ? s.name : '';
     if (!confirm(`确定要重置学员「${name}」的密码吗？\n重置后密码为身份证后6位，登录后需重新修改密码。`)) return;
     apiFetch(`${API_BASE}/students/${id}/reset-password`, { method: 'POST' }).then(r => r.json()).then(res => {
         if (res.success) {
@@ -2765,7 +2872,9 @@ function resetPassword(id, name) {
     });
 }
 
-function deleteStudent(id, name) {
+function deleteStudent(id) {
+    const s = allStudents.find(x => x._id === id);
+    const name = s ? s.name : '';
     if (!confirm(`确定要删除学员「${name}」吗？此操作不可恢复。`)) return;
     apiFetch(`${API_BASE}/students/${id}`, { method: 'DELETE' }).then(r => r.json()).then(res => {
         if (res.success) { showToast('删除成功'); loadStudents(); } else showToast(res.message, 'error');
@@ -2833,7 +2942,7 @@ function confirmImport() {
                 <div><strong>导入完成</strong>：共 ${d.total} 条，新增 ${d.added} 条，更新 ${d.updated} 条，失败 ${d.failed} 条</div>
             </div>`;
             if (d.errors.length > 0) {
-                html += '<div class="error-list">' + d.errors.map(e => `<div class="error-item">${ico('i-alert','ico-sm')} ${e}</div>`).join('') + '</div>';
+                html += '<div class="error-list">' + d.errors.map(e => `<div class="error-item">${ico('i-alert','ico-sm')} ${escapeHtml(e)}</div>`).join('') + '</div>';
             }
             document.getElementById('importResult').innerHTML = html;
             loadStudents();
@@ -2841,12 +2950,12 @@ function confirmImport() {
             document.getElementById('selectedFileBox').classList.add('hidden');
             document.getElementById('fileInput').value = '';
         } else {
-            document.getElementById('importResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>${res.message}</div></div>`;
+            document.getElementById('importResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>${escapeHtml(res.message)}</div></div>`;
         }
     }).catch(err => {
         btn.disabled = false;
         btn.textContent = '确认导入';
-        document.getElementById('importResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>导入失败：${err.message}</div></div>`;
+        document.getElementById('importResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>导入失败：${escapeHtml(err.message)}</div></div>`;
     });
 }
 
@@ -2877,17 +2986,17 @@ function renderRequests(requests) {
         const entryDate = r.entryDate || '-';
         const timeSlot = r.entryStartTime ? `${r.entryStartTime} - ${r.entryEndTime}` : '-';
         return `<tr>
-            <td><strong>${r.name}</strong></td>
-            <td class="num">${r.phone}</td>
-            <td class="num">${r.carPlate || '-'}</td>
-            <td class="num">${entryDate}</td>
-            <td class="num cell-wrap">${timeSlot}</td>
-            <td class="num">${time}</td>
+            <td><strong>${escapeHtml(r.name)}</strong></td>
+            <td class="num">${escapeHtml(r.phone)}</td>
+            <td class="num">${escapeHtml(r.carPlate) || '-'}</td>
+            <td class="num">${escapeHtml(entryDate)}</td>
+            <td class="num cell-wrap">${escapeHtml(timeSlot)}</td>
+            <td class="num">${escapeHtml(time)}</td>
             <td><span class="tag ${statusClass}"><span class="tag-dot"></span>${statusText}</span></td>
             <td>
                 ${r.status === 'pending' ? `
-                    <button class="btn btn-success btn-sm" onclick="approveRequest('${r._id}')">${ico('i-check','ico-sm')}通过</button>
-                    <button class="btn btn-danger btn-sm" onclick="showRejectModal('${r._id}')">${ico('i-x','ico-sm')}拒绝</button>
+                    <button class="btn btn-success btn-sm" onclick="approveRequest('${escapeHtml(r._id)}')">${ico('i-check','ico-sm')}通过</button>
+                    <button class="btn btn-danger btn-sm" onclick="showRejectModal('${escapeHtml(r._id)}')">${ico('i-x','ico-sm')}拒绝</button>
                 ` : r.status === 'approved' ? '<span class="tag tag-approved"><span class="tag-dot"></span>已通过</span>' : r.status === 'rejected' ? '<span class="tag tag-rejected"><span class="tag-dot"></span>已拒绝</span>' : '<span style="color:var(--ink-3)">-</span>'}
             </td>
         </tr>`;
@@ -2919,26 +3028,25 @@ function confirmReject() {
 // ============ 账户管理 ============
 function loadAccounts() {
     const tbody = document.getElementById('accountTableBody');
-    tbody.innerHTML = skeletonRows(5, 6);
+    tbody.innerHTML = skeletonRows(4, 6);
     apiFetch(`${API_BASE}/accounts`).then(r => r.json()).then(res => {
         if (res.success) renderAccounts(res.data);
-    }).catch(() => { tbody.innerHTML = emptyCell(5, 'i-alert', '加载失败'); });
+    }).catch(() => { tbody.innerHTML = emptyCell(4, 'i-alert', '加载失败'); });
 }
 
 function renderAccounts(accounts) {
     const tbody = document.getElementById('accountTableBody');
     if (accounts.length === 0) {
-        tbody.innerHTML = emptyCell(5, 'i-key', '暂无账户数据', '点击「从学员列表同步」生成账户');
+        tbody.innerHTML = emptyCell(4, 'i-key', '暂无账户数据', '点击「从学员列表同步」生成账户');
         return;
     }
     tbody.innerHTML = accounts.map(a => {
         const time = a.createdAt ? new Date(a.createdAt).toLocaleString('zh-CN') : '-';
         return `<tr>
-            <td><strong>${a.name || '-'}</strong></td>
-            <td class="num">${a.phone}</td>
-            <td><code style="background:var(--neutral-bg);padding:2px 6px;border-radius:6px;font-size:13px;">${a.password || '-'}</code></td>
+            <td><strong>${escapeHtml(a.name) || '-'}</strong></td>
+            <td class="num">${escapeHtml(a.phone)}</td>
             <td><span class="tag ${a.role === 'admin' ? 'tag-approved' : 'tag-pending'}"><span class="tag-dot"></span>${a.role === 'admin' ? '管理员' : '学员'}</span></td>
-            <td class="num">${time}</td>
+            <td class="num">${escapeHtml(time)}</td>
         </tr>`;
     }).join('');
 }
@@ -2967,20 +3075,23 @@ function renderAdmins(admins) {
     const roleMap = { superadmin: '超级管理员', admin: '管理员' };
     const isSuperAdmin = currentAdminRole === 'superadmin';
     const currentPhone = localStorage.getItem('adminLogin') ? JSON.parse(localStorage.getItem('adminLogin')).phone : '';
+    rowStore.admins = {};
     tbody.innerHTML = admins.map(a => {
+        const rowId = a._id || a.id;
+        rowStore.admins[rowId] = { id: rowId, name: a.name, phone: a.phone, role: a.role, classes: a.classes || [] };
         const isDefault = a.phone === 'admin';
         const isSelf = a.phone === currentPhone;
         const created = a.createdAt ? new Date(a.createdAt).toLocaleDateString('zh-CN') : '-';
-        const classes = (a.classes && a.classes.length > 0) ? a.classes.join('、') : '<span style="color:var(--ink-3)">未分配</span>';
+        const classes = (a.classes && a.classes.length > 0) ? escapeHtml(a.classes.join('、')) : '<span style="color:var(--ink-3)">未分配</span>';
         return `<tr>
-            <td><strong>${a.name}</strong></td>
-            <td class="num">${a.phone} ${isDefault ? '<span class="tag tag-approved" style="font-size:11px;">默认</span>' : ''}</td>
-            <td>${roleMap[a.role] || a.role}</td>
+            <td><strong>${escapeHtml(a.name)}</strong></td>
+            <td class="num">${escapeHtml(a.phone)} ${isDefault ? '<span class="tag tag-approved" style="font-size:11px;">默认</span>' : ''}</td>
+            <td>${escapeHtml(roleMap[a.role] || a.role)}</td>
             <td class="cell-wrap" style="font-size:12px;">${classes}</td>
-            <td class="num">${created}</td>
+            <td class="num">${escapeHtml(created)}</td>
             <td>
-                ${isSuperAdmin ? `<button class="btn btn-ghost btn-sm btn-icon" onclick='editAdmin("${a.id}","${a.name}","${a.phone}","${a.role}",${JSON.stringify(a.classes || [])})' title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>` : ''}
-                ${isSuperAdmin && !isDefault && !isSelf ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="deleteAdmin('${a.id}','${a.name}')" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>` : ''}
+                ${isSuperAdmin ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="editAdmin('${escapeHtml(rowId)}')" title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>` : ''}
+                ${isSuperAdmin && !isDefault && !isSelf ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="deleteAdmin('${escapeHtml(rowId)}')" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>` : ''}
             </td>
         </tr>`;
     }).join('');
@@ -2996,16 +3107,18 @@ function showAddAdminModal() {
     document.getElementById('adminModal').classList.add('show');
 }
 
-function editAdmin(id, name, phone, role, classes) {
+function editAdmin(id) {
+    const a = rowStore.admins[id];
+    if (!a) return;
     document.getElementById('adminModalTitle').textContent = '编辑管理员';
     document.getElementById('editAdminId').value = id;
-    document.getElementById('adminName').value = name;
-    document.getElementById('adminPhone').value = phone;
+    document.getElementById('adminName').value = a.name || '';
+    document.getElementById('adminPhone').value = a.phone || '';
     document.getElementById('adminPwd').value = '';
-    document.getElementById('adminRole').value = role || 'admin';
+    document.getElementById('adminRole').value = a.role || 'admin';
     document.getElementById('pwdRequired').style.display = 'none';
     document.getElementById('pwdHint').style.display = '';
-    loadClassesForAdmin(classes || []);
+    loadClassesForAdmin(a.classes || []);
     document.getElementById('adminModal').classList.add('show');
 }
 
@@ -3018,7 +3131,7 @@ function loadClassesForAdmin(selectedClasses) {
         }
         container.innerHTML = res.data.map(c =>
             `<label>
-                <input type="checkbox" class="admin-class-check" value="${c}" ${selectedClasses.includes(c) ? 'checked' : ''}> ${c}
+                <input type="checkbox" class="admin-class-check" value="${escapeHtml(c)}" ${selectedClasses.includes(c) ? 'checked' : ''}> ${escapeHtml(c)}
             </label>`
         ).join('');
     });
@@ -3061,7 +3174,9 @@ function saveAdmin() {
     }
 }
 
-function deleteAdmin(id, name) {
+function deleteAdmin(id) {
+    const a = rowStore.admins[id];
+    const name = a ? a.name : '';
     if (!confirm(`确定要删除管理员"${name}"吗？`)) return;
     apiFetch(`${API_BASE}/admins/${id}`, {
         method: 'DELETE'
@@ -3075,7 +3190,7 @@ function showToast(msg, type = 'success') {
     const icons = { success: 'i-check-circle', error: 'i-x-circle', info: 'i-info' };
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
-    toast.innerHTML = ico(icons[type] || 'i-info') + ` <span>${msg}</span>`;
+    toast.innerHTML = ico(icons[type] || 'i-info') + ` <span>${escapeHtml(msg)}</span>`;
     document.body.appendChild(toast);
     Motion.toastIn(toast);
     setTimeout(() => { toast.classList.add('out'); setTimeout(() => toast.remove(), 300); }, 3000);
@@ -3125,12 +3240,18 @@ document.addEventListener('keydown', e => {
             closeSidebar();
             return;
         }
-        document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show'));
+        document.querySelectorAll('.modal-overlay.show').forEach(m => {
+            if (m.id === 'forcePwdModal') return; // 强制改密不可关闭
+            m.classList.remove('show');
+        });
     }
 });
 
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
-    overlay.addEventListener('mousedown', e => { if (e.target === overlay) overlay.classList.remove('show'); });
+    overlay.addEventListener('mousedown', e => {
+        if (overlay.id === 'forcePwdModal') return;
+        if (e.target === overlay) overlay.classList.remove('show');
+    });
 });
 
 // 卸载/离开页面时销毁 Lenis 与 ScrollTrigger，避免残留
@@ -3152,16 +3273,17 @@ function renderTips(tips) {
         tbody.innerHTML = emptyCell(4, 'i-bulb', '暂无温馨提示', '点击右上角按钮添加');
         return;
     }
+    rowStore.tips = {};
     tbody.innerHTML = tips.map(t => {
         const time = t.updatedAt ? new Date(t.updatedAt).toLocaleString('zh-CN') : '-';
-        const safeContent = (t.content || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+        rowStore.tips[t._id] = { id: t._id, className: t.className, content: t.content || '' };
         return `<tr>
-            <td><strong>${t.className}</strong></td>
-            <td style="max-width:400px;white-space:pre-wrap;">${t.content || '<span style="color:var(--ink-3)">空</span>'}</td>
-            <td class="num">${time}</td>
+            <td><strong>${escapeHtml(t.className)}</strong></td>
+            <td style="max-width:400px;white-space:pre-wrap;">${escapeHtml(t.content) || '<span style="color:var(--ink-3)">空</span>'}</td>
+            <td class="num">${escapeHtml(time)}</td>
             <td>
-                <button class="btn btn-ghost btn-sm btn-icon" onclick="editTip('${t._id}','${t.className}','${safeContent}')" title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>
-                <button class="btn btn-ghost btn-sm btn-icon" onclick="deleteTip('${t._id}','${t.className}')" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="editTip('${escapeHtml(t._id)}')" title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="deleteTip('${escapeHtml(t._id)}')" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>
             </td>
         </tr>`;
     }).join('');
@@ -3176,11 +3298,13 @@ function showAddTipModal() {
     document.getElementById('tipModal').classList.add('show');
 }
 
-function editTip(id, className, content) {
+function editTip(id) {
+    const t = rowStore.tips[id];
+    if (!t) return;
     document.getElementById('tipModalTitle').textContent = '编辑温馨提示';
     document.getElementById('editTipId').value = id;
-    document.getElementById('tipContent').value = content;
-    loadClassOptions(className);
+    document.getElementById('tipContent').value = t.content || '';
+    loadClassOptions(t.className);
     document.getElementById('tipModal').classList.add('show');
 }
 
@@ -3190,7 +3314,7 @@ function loadClassOptions(selected) {
         sel.innerHTML = '<option value="">请选择班级</option>';
         if (res.success && res.data) {
             res.data.forEach(c => {
-                sel.innerHTML += `<option value="${c}" ${c === selected ? 'selected' : ''}>${c}</option>`;
+                sel.innerHTML += `<option value="${escapeHtml(c)}" ${c === selected ? 'selected' : ''}>${escapeHtml(c)}</option>`;
             });
         }
     });
@@ -3211,7 +3335,9 @@ function saveTip() {
     });
 }
 
-function deleteTip(id, className) {
+function deleteTip(id) {
+    const t = rowStore.tips[id];
+    const className = t ? t.className : '';
     if (!confirm(`确定删除「${className}」的温馨提示？`)) return;
     apiFetch(`${API_BASE}/tips/${id}`, { method: 'DELETE' }).then(r => r.json()).then(res => {
         if (res.success) { showToast(res.message); loadTips(); } else showToast(res.message, 'error');
@@ -3243,12 +3369,12 @@ function handleAdminFileSelect(e) {
             const d = res.data;
             let html = `<div class="result-box result-success"><span class="result-icon">${ico('i-check-circle')}</span><div>导入完成：共 ${d.total} 条，成功 ${d.added} 条，失败 ${d.failed} 条</div></div>`;
             if (d.errors && d.errors.length > 0) {
-                html += '<div class="error-list">' + d.errors.map(e => `<div class="error-item">${ico('i-alert','ico-sm')} ${e}</div>`).join('') + '</div>';
+                html += '<div class="error-list">' + d.errors.map(e => `<div class="error-item">${ico('i-alert','ico-sm')} ${escapeHtml(e)}</div>`).join('') + '</div>';
             }
             document.getElementById('adminImportResult').innerHTML = html;
             loadAdmins();
         } else {
-            document.getElementById('adminImportResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>${res.message}</div></div>`;
+            document.getElementById('adminImportResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>${escapeHtml(res.message)}</div></div>`;
         }
     });
 }

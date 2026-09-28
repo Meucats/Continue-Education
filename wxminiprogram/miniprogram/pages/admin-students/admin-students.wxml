@@ -1,0 +1,69 @@
+<view class="students-container m-page-enter">
+  <view class="header card">
+    <view class="page-title">学员管理</view>
+    <view class="search-box">
+      <input class="search-input" placeholder="搜索学员姓名或手机号" value="{{searchKey}}" bindinput="onSearchInput" bindconfirm="onSearch" />
+      <button class="search-btn" bindtap="onSearch">搜索</button>
+    </view>
+  </view>
+
+  <view class="stats-bar">
+    <text class="stats-text">共 {{students.length}} 名学员</text>
+  </view>
+
+  <view class="student-list m-stagger" wx:if="{{students.length > 0}}">
+    <view class="student-card card" wx:for="{{students}}" wx:key="_id">
+      <view class="student-header">
+        <view class="student-name">{{item.name}}</view>
+        <view class="student-phone">{{item.phone}}</view>
+      </view>
+      <view class="student-info">
+        <view class="info-row">
+          <text class="info-label">班级：</text>
+          <text class="info-value">{{item.className}}</text>
+        </view>
+        <view class="info-row" wx:if="{{item.company}}">
+          <text class="info-label">公司：</text>
+          <text class="info-value">{{item.company}}</text>
+        </view>
+        <view class="info-row" wx:if="{{item.idCard}}">
+          <text class="info-label">身份证：</text>
+          <text class="info-value">{{item.idCard}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">时间：</text>
+          <text class="info-value">{{item.schedule}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">地点：</text>
+          <text class="info-value">{{item.location}}</text>
+        </view>
+        <view class="info-row" wx:if="{{item.courseStartDate}}">
+          <text class="info-label">课程周期：</text>
+          <text class="info-value">{{item.courseStartDate}} 至 {{item.courseEndDate}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">截止：</text>
+          <text class="info-value {{item.expired ? 'text-danger' : 'text-success'}}">{{item.deadline}}</text>
+        </view>
+        <view class="info-row" wx:if="{{item.courseDates && item.courseDates.length > 0}}">
+          <text class="info-label">排课：</text>
+          <text class="info-value text-primary">共{{item.courseDates.length}}节课</text>
+        </view>
+      </view>
+      <view class="student-actions">
+        <view class="action-btn edit-btn" bindtap="onEdit" data-id="{{item._id}}">编辑</view>
+        <view class="action-btn reset-btn" bindtap="onResetPwd" data-id="{{item._id}}" data-name="{{item.name}}">重置密码</view>
+        <view class="action-btn delete-btn" bindtap="onDelete" data-id="{{item._id}}" data-name="{{item.name}}">删除</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty-tip" wx:else>
+    <text>暂无学员数据</text>
+  </view>
+
+  <view class="floating-btn" bindtap="goToAdd">
+    <text>+</text>
+  </view>
+</view>

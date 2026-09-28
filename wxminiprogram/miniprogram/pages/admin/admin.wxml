@@ -1,0 +1,79 @@
+<view class="admin-container m-page-enter">
+  <view class="login-section" wx:if="{{!isAdmin}}">
+    <view class="login-header">
+      <image class="school-logo" src="/images/school-emblem.png" mode="aspectFit" />
+      <view class="admin-title">管理后台</view>
+      <view class="admin-subtitle">杭职大继续教育学院</view>
+    </view>
+
+    <view class="login-form card m-enter m-enter-d2">
+      <view class="input-group">
+        <view class="input-label">管理员账号</view>
+        <input class="input-field" placeholder="请输入管理员账号" placeholder-class="ph" value="{{adminPhone}}" bindinput="onAdminPhoneInput" />
+      </view>
+
+      <view class="input-group">
+        <view class="input-label">密码</view>
+        <input class="input-field" password placeholder="请输入密码" placeholder-class="ph" value="{{adminPassword}}" bindinput="onAdminPasswordInput" />
+      </view>
+
+      <button class="btn-primary login-btn" bindtap="onAdminLogin">登录</button>
+    </view>
+
+    <view class="login-tip">
+      <text>默认账号: admin　密码: admin123</text>
+    </view>
+  </view>
+
+  <view class="dashboard-section" wx:else>
+    <view class="dashboard-header card">
+      <view class="admin-name">欢迎，{{adminInfo.name || '管理员'}}</view>
+      <view class="logout-btn" bindtap="onLogout">退出</view>
+    </view>
+
+    <view class="menu-grid m-stagger">
+      <view class="menu-item card" bindtap="goToStudents">
+        <view class="menu-ic-wrap"><view class="ic ic-b-users"></view></view>
+        <view class="menu-title">学员管理</view>
+        <view class="menu-desc">查看和管理学员信息</view>
+      </view>
+
+      <view class="menu-item card" bindtap="goToAddStudent">
+        <view class="menu-ic-wrap"><view class="ic ic-b-plus"></view></view>
+        <view class="menu-title">添加学员</view>
+        <view class="menu-desc">逐条添加学员信息</view>
+      </view>
+
+      <view class="menu-item card" bindtap="goToImport">
+        <view class="menu-ic-wrap"><view class="ic ic-b-upload"></view></view>
+        <view class="menu-title">批量导入</view>
+        <view class="menu-desc">从Excel批量导入学员</view>
+      </view>
+
+      <view class="menu-item card" bindtap="goToRequests">
+        <view class="menu-ic-wrap"><view class="ic ic-b-clipboard"></view></view>
+        <view class="menu-title">入校申请</view>
+        <view class="menu-desc">审批学员入校申请</view>
+      </view>
+
+      <view class="menu-item card" bindtap="goToAccounts">
+        <view class="menu-ic-wrap"><view class="ic ic-b-key"></view></view>
+        <view class="menu-title">账户管理</view>
+        <view class="menu-desc">管理学员登录账户</view>
+      </view>
+    </view>
+
+    <view class="stats-section m-enter m-enter-d5">
+      <view class="stats-row">
+        <view class="stat-item card">
+          <view class="stat-num num">{{stats.studentCount}}</view>
+          <view class="stat-label">学员总数</view>
+        </view>
+        <view class="stat-item card">
+          <view class="stat-num num warn-num">{{stats.requestCount}}</view>
+          <view class="stat-label">待审核申请</view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

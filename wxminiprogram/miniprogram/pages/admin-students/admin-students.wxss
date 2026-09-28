@@ -1,0 +1,176 @@
+.students-container {
+  padding: 20rpx;
+  min-height: 100vh;
+  background: var(--bg);
+  padding-bottom: calc(160rpx + env(safe-area-inset-bottom));
+}
+
+.header {
+  padding: 30rpx;
+}
+
+.header .page-title {
+  margin-bottom: 20rpx;
+  font-size: 34rpx;
+}
+
+.search-box {
+  display: flex;
+  gap: 15rpx;
+}
+
+.search-input {
+  flex: 1;
+  border: 2rpx solid var(--line);
+  border-radius: var(--r-ctrl);
+  padding: 0 22rpx;
+  font-size: 28rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  background-color: var(--surface);
+  color: var(--ink);
+}
+
+.search-btn {
+  background-color: var(--accent) !important;
+  color: white !important;
+  font-size: 27rpx !important;
+  font-weight: 600 !important;
+  padding: 0 30rpx !important;
+  border-radius: var(--r-ctrl) !important;
+  height: 72rpx !important;
+  line-height: 72rpx !important;
+}
+
+.stats-bar {
+  padding: 15rpx 10rpx;
+}
+
+.stats-text {
+  font-size: 26rpx;
+  color: var(--ink-3);
+}
+
+.student-card {
+  padding: 26rpx;
+  margin-bottom: 16rpx;
+}
+
+.student-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14rpx;
+}
+
+.student-name {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.student-phone {
+  font-size: 26rpx;
+  color: var(--ink-3);
+}
+
+.student-info {
+  padding: 12rpx 0;
+  border-top: 1rpx solid var(--line);
+  border-bottom: 1rpx solid var(--line);
+}
+
+.student-info .info-row {
+  display: flex;
+  margin-bottom: 8rpx;
+}
+
+.student-info .info-label {
+  font-size: 25rpx;
+  color: var(--ink-3);
+  width: 130rpx;
+  flex-shrink: 0;
+}
+
+.student-info .info-value {
+  font-size: 25rpx;
+  color: var(--ink);
+  flex: 1;
+}
+
+.text-danger { color: var(--danger); }
+.text-success { color: var(--success); }
+.text-primary { color: var(--accent); }
+
+.student-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12rpx 16rpx;
+  margin-top: 16rpx;
+}
+
+.action-btn {
+  font-size: 25rpx;
+  font-weight: 550;
+  padding: 10rpx 24rpx;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64rpx;
+  min-width: 88rpx;
+  line-height: 1.4;
+  transition: background-color var(--dur-fast, 150ms) ease, border-color var(--dur-fast, 150ms) ease, transform var(--dur-fast, 150ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+.action-btn:active {
+  transform: scale(0.96);
+  opacity: 0.92;
+}
+
+.edit-btn {
+  color: var(--accent);
+  border: 2rpx solid var(--accent-line);
+  background: var(--accent-soft);
+}
+
+.reset-btn {
+  color: var(--warning);
+  border: 2rpx solid var(--warning-bg);
+  background: var(--warning-bg);
+}
+
+.delete-btn {
+  color: var(--danger);
+  border: 2rpx solid var(--danger-line);
+  background: var(--danger-bg);
+}
+
+.floating-btn {
+  position: fixed;
+  right: 40rpx;
+  bottom: calc(60rpx + env(safe-area-inset-bottom));
+  width: 100rpx;
+  height: 100rpx;
+  background-color: var(--accent);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 50rpx;
+  box-shadow: 0 12rpx 28rpx -8rpx var(--accent);
+  z-index: 10;
+  transition: transform var(--dur-fast, 150ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)), box-shadow var(--dur-fast, 150ms) ease;
+  animation: m-scale-in var(--dur-slow, 400ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation-delay: 280ms;
+}
+
+.floating-btn:active {
+  transform: scale(0.94);
+}
+
+.floating-btn text {
+  margin-top: -5rpx;
+}

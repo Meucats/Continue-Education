@@ -18,8 +18,8 @@ webadmin/.env
 .env.*
 !.env.example
 
-# 小程序不进本仓库（用微信开发者工具上传）
-wxminiprogram/
+# 小程序依赖构建产物（用微信开发者工具重新生成）
+wxminiprogram/miniprogram_npm/
 
 # 系统
 .DS_Store

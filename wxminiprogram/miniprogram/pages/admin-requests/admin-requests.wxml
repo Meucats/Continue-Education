@@ -1,0 +1,80 @@
+<view class="requests-container m-page-enter">
+  <view class="page-title">入校申请管理</view>
+
+  <view class="filter-tabs">
+    <view class="tab {{currentTab === 'pending' ? 'active' : ''}}" bindtap="switchTab" data-tab="pending">
+      待审核 ({{pendingCount}})
+    </view>
+    <view class="tab {{currentTab === 'approved' ? 'active' : ''}}" bindtap="switchTab" data-tab="approved">
+      已通过
+    </view>
+    <view class="tab {{currentTab === 'rejected' ? 'active' : ''}}" bindtap="switchTab" data-tab="rejected">
+      已拒绝
+    </view>
+    <view class="tab {{currentTab === 'all' ? 'active' : ''}}" bindtap="switchTab" data-tab="all">
+      全部
+    </view>
+  </view>
+
+  <view class="request-list m-stagger" wx:if="{{filteredRequests.length > 0}}">
+    <view class="request-card card" wx:for="{{filteredRequests}}" wx:key="_id">
+      <view class="request-header">
+        <view class="request-name">{{item.name}}</view>
+        <text class="tag tag-expired" wx:if="{{item.isExpired}}">已过期</text>
+        <text class="tag tag-pending" wx:elif="{{item.status === 'pending'}}">待审核</text>
+        <text class="tag tag-approved" wx:elif="{{item.status === 'approved'}}">已通过</text>
+        <text class="tag tag-rejected" wx:elif="{{item.status === 'rejected'}}">已拒绝</text>
+      </view>
+
+      <view class="request-info">
+        <view class="info-row">
+          <text class="info-label">手机号</text>
+          <text class="info-value num">{{item.phone}}</text>
+        </view>
+        <view class="info-row" wx:if="{{item.carPlate}}">
+          <text class="info-label">车牌号</text>
+          <text class="info-value num">{{item.carPlate}}</text>
+        </view>
+        <view class="info-row" wx:if="{{item.entryDate}}">
+          <text class="info-label">进校日期</text>
+          <text class="info-value num">{{item.entryDate}}</text>
+        </view>
+        <view class="info-row" wx:if="{{item.entryStartTime}}">
+          <text class="info-label">有效时段</text>
+          <text class="info-value num">{{item.entryStartTime}} - {{item.entryEndTime}}</text>
+        </view>
+        <view class="info-row">
+          <text class="info-label">申请时间</text>
+          <text class="info-value num">{{item.createdAtText}}</text>
+        </view>
+        <view class="info-row" wx:if="{{item.rejectReason}}">
+          <text class="info-label">拒绝原因</text>
+          <text class="info-value reject-reason">{{item.rejectReason}}</text>
+        </view>
+      </view>
+
+      <view class="request-actions" wx:if="{{item.status === 'pending'}}">
+        <button class="btn-success action-btn" bindtap="onApprove" data-id="{{item._id}}">通过</button>
+        <button class="btn-danger action-btn" bindtap="onReject" data-id="{{item._id}}">拒绝</button>
+      </view>
+
+      <view class="request-status-tip approved-tip" wx:if="{{item.status === 'approved' && !item.isExpired}}">
+        已通过 · 有效期内
+      </view>
+
+      <view class="request-status-tip expired-tip" wx:if="{{item.status === 'approved' && item.isExpired}}">
+        已过期 · 该申请已超过有效时段
+      </view>
+
+      <view class="request-status-tip rejected-tip" wx:if="{{item.status === 'rejected'}}">
+        已拒绝
+      </view>
+    </view>
+  </view>
+
+  <view class="e-box" wx:else>
+    <view class="ic ic-g-inbox"></view>
+    <view class="e-t">暂无申请数据</view>
+    <view class="e-d">切换上方标签查看其他状态</view>
+  </view>
+</view>

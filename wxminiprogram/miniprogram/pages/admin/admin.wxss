@@ -1,0 +1,175 @@
+.admin-container {
+  min-height: 100vh;
+  background-color: var(--bg);
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
+}
+
+.ph { color: var(--ink-3); }
+
+.login-section {
+  padding: 40rpx;
+}
+
+.login-header {
+  text-align: center;
+  padding: 70rpx 0 50rpx;
+}
+
+.school-logo {
+  width: 140rpx;
+  height: 140rpx;
+  display: block;
+  margin: 0 auto 28rpx;
+  padding: 14rpx;
+  box-sizing: border-box;
+  background: var(--accent-soft);
+  border-radius: 50%;
+  border: 2rpx solid var(--accent-line);
+  box-shadow: 0 10rpx 28rpx -12rpx rgba(21, 88, 199, 0.3);
+}
+
+.admin-title {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 12rpx;
+}
+
+.admin-subtitle {
+  font-size: 28rpx;
+  color: var(--ink-3);
+}
+
+.login-form {
+  padding: 44rpx 36rpx;
+}
+
+.login-btn {
+  width: 100% !important;
+  height: 92rpx !important;
+  line-height: 92rpx !important;
+  font-size: 34rpx !important;
+  margin-top: 36rpx !important;
+  border-radius: var(--r-ctrl) !important;
+}
+
+.login-tip {
+  text-align: center;
+  margin-top: 36rpx;
+}
+
+.login-tip text {
+  font-size: 24rpx;
+  color: var(--ink-3);
+}
+
+.dashboard-section {
+  padding: 20rpx;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+}
+
+.admin-name {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.logout-btn {
+  font-size: 26rpx;
+  font-weight: 550;
+  color: var(--danger);
+  padding: 12rpx 26rpx;
+  border: 2rpx solid rgba(192, 38, 38, 0.35);
+  background: var(--danger-bg);
+  border-radius: 999px;
+  transition: background-color var(--dur-fast, 150ms) ease, transform var(--dur-fast, 150ms) var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+
+.logout-btn:active {
+  transform: scale(0.96);
+  background: #f8dcdc;
+}
+
+.menu-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+}
+
+.menu-item {
+  width: calc(50% - 10rpx);
+  padding: 30rpx 24rpx;
+  text-align: left;
+  box-sizing: border-box;
+  margin-bottom: 0;
+}
+
+.menu-item:active { background: var(--surface-2); }
+
+.menu-ic-wrap {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 18rpx;
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18rpx;
+}
+
+.menu-ic-wrap .ic {
+  width: 36rpx;
+  height: 36rpx;
+}
+
+.menu-title {
+  font-size: 29rpx;
+  font-weight: 650;
+  color: var(--ink);
+  margin-bottom: 8rpx;
+}
+
+.menu-desc {
+  font-size: 23rpx;
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+
+.stats-section {
+  margin-top: 30rpx;
+}
+
+.stats-row {
+  display: flex;
+  gap: 20rpx;
+}
+
+.stat-item {
+  flex: 1;
+  padding: 30rpx;
+  text-align: center;
+  margin-bottom: 0;
+}
+
+.stat-num {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 10rpx;
+}
+
+.stat-num.warn-num {
+  color: var(--warning);
+}
+
+.stat-label {
+  font-size: 26rpx;
+  color: var(--ink-3);
+}

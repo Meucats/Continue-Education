@@ -1,0 +1,150 @@
+<view class="index-page m-page-enter {{isWarm ? 'warm-theme' : ''}}">
+  <view class="top-banner">
+    <view class="banner-inner">
+      <image class="banner-mark" src="/images/school-emblem.png" mode="aspectFit" />
+      <view class="banner-copy">
+        <view class="banner-school">杭州职业技术大学</view>
+        <view class="banner-college">继续教育学院</view>
+      </view>
+    </view>
+  </view>
+  
+  <view class="greeting-bar" wx:if="{{isLoggedIn}}">
+    <view class="greeting-text">Hi, {{userInfo.name}}</view>
+  </view>
+
+  <view class="tip-card" wx:if="{{hasTip}}">
+    <view class="tip-ic-chip">
+      <view class="tip-ic ic ic-b-info"></view>
+    </view>
+    <view class="tip-body">
+      <view class="tip-label">温馨提示</view>
+      <view class="tip-text">{{tipContent}}</view>
+    </view>
+  </view>
+
+  <view class="feature-grid">
+    <view class="feature-item" bindtap="goToSchedule">
+      <view class="feature-icon"><view class="ic ic-w-cal"></view></view>
+      <view class="feature-title">我的课表</view>
+      <view class="feature-desc">{{isLoggedIn ? '查看课程安排' : '登录查看课表'}}</view>
+    </view>
+    <view class="feature-item" bindtap="goToConsult">
+      <view class="feature-icon"><view class="ic ic-w-building"></view></view>
+      <view class="feature-title">入校申请</view>
+      <view class="feature-desc">咨询进校审批</view>
+    </view>
+    <view class="feature-item" bindtap="onCallPhone">
+      <view class="feature-icon"><view class="ic ic-w-phone"></view></view>
+      <view class="feature-title">联系电话</view>
+      <view class="feature-desc num">56700015</view>
+    </view>
+  </view>
+
+  <view wx:if="{{isLoggedIn}}">
+    <view class="s-card" wx:if="{{hasCourse}}">
+      <view class="s-head">
+        <view class="s-title"><view class="ic ic-g-clipboard"></view>我的课程</view>
+        <view class="s-more" bindtap="goToSchedule">查看全部</view>
+      </view>
+      <view class="course-list">
+        <view class="course-item" wx:for="{{courses}}" wx:key="_id">
+          <view class="course-dot {{item.dayEnded ? 'dot-ended' : 'dot-active'}}"></view>
+          <view class="course-detail">
+            <view class="course-name">{{item.className}}</view>
+            <view class="course-day" wx:if="{{item.dayOfWeek}}">{{item.date}} {{item.dayOfWeek}}</view>
+            <view class="course-time-row" wx:if="{{item.timeStart}}">
+              <view class="ic ic-g-clock row-ic"></view>
+              <text class="num">{{item.timeStart}} - {{item.timeEnd}}</text>
+            </view>
+            <view class="course-loc-row">
+              <view class="ic ic-g-pin row-ic"></view>
+              <text>{{item.location}}</text>
+            </view>
+          </view>
+          <view class="course-tag {{item.dayEnded ? 'tag-ended' : 'tag-active'}}">
+            {{item.dayEnded ? '已结束' : '有效'}}
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="s-card" wx:if="{{!hasCourse}}">
+      <view class="e-box">
+        <view class="ic ic-g-inbox"></view>
+        <view class="e-t">暂无课程信息</view>
+        <view class="e-d">如需咨询课程，请点击「入校申请」</view>
+      </view>
+    </view>
+
+    <view class="s-card" wx:if="{{requestInfo}}">
+      <view class="s-head">
+        <view class="s-title"><view class="ic ic-b-building"></view>进校申请</view>
+      </view>
+      <view class="st-badge st-expired" wx:if="{{isRequestExpired}}"><view class="ic ic-warn"></view>已过期</view>
+      <view class="st-badge st-pending" wx:elif="{{requestInfo.status === 'pending'}}"><view class="ic ic-warn"></view>审核中</view>
+      <view class="st-badge st-approved" wx:elif="{{requestInfo.status === 'approved'}}"><view class="ic ic-ok"></view>已通过</view>
+      <view class="st-badge st-rejected" wx:elif="{{requestInfo.status === 'rejected'}}"><view class="ic ic-bad"></view>已拒绝</view>
+      <view class="request-detail" wx:if="{{requestInfo.status === 'approved' && !isRequestExpired}}">
+        <view class="i-row">
+          <text class="i-k">进校日期</text>
+          <text class="i-v num">{{requestInfo.entryDate}}</text>
+        </view>
+        <view class="i-row" wx:if="{{requestInfo.entryStartTime}}">
+          <text class="i-k">有效时段</text>
+          <text class="i-v num">{{requestInfo.entryStartTime}} - {{requestInfo.entryEndTime}}</text>
+        </view>
+        <view class="i-row">
+          <text class="i-k">咨询地点</text>
+          <text class="i-v">继教院 3406 办公室</text>
+        </view>
+        <view class="i-row">
+          <text class="i-k">联系电话</text>
+          <text class="i-v num" bindtap="onCallPhone">56700015</text>
+        </view>
+      </view>
+      <view class="request-detail" wx:if="{{requestInfo.status === 'approved' && isRequestExpired}}">
+        <view class="i-row">
+          <text class="i-k">进校日期</text>
+          <text class="i-v num">{{requestInfo.entryDate}}</text>
+        </view>
+        <view class="i-row" wx:if="{{requestInfo.entryStartTime}}">
+          <text class="i-k">有效时段</text>
+          <text class="i-v num">{{requestInfo.entryStartTime}} - {{requestInfo.entryEndTime}}</text>
+        </view>
+        <view class="expired-tip">申请已过期，如需再次进校请重新提交</view>
+      </view>
+      <view class="request-detail" wx:if="{{requestInfo.status === 'rejected'}}">
+        <view class="i-row">
+          <text class="i-k">拒绝原因</text>
+          <text class="i-v">{{requestInfo.rejectReason || '未说明原因'}}</text>
+        </view>
+      </view>
+      <view class="pending-tip" wx:if="{{requestInfo.status === 'pending'}}">
+        您的申请正在审核中，请耐心等待
+      </view>
+    </view>
+  </view>
+
+  <view class="s-card" wx:else>
+    <view class="login-prompt">
+      <view class="ic ic-g-lock prompt-ic"></view>
+      <view class="prompt-text">登录后可查看个人课程和申请状态</view>
+      <button class="btn-primary prompt-btn" bindtap="goToLogin">立即登录</button>
+    </view>
+  </view>
+
+  <view class="s-card contact-section">
+    <view class="s-head">
+      <view class="s-title"><view class="ic ic-g-pin"></view>联系我们</view>
+    </view>
+    <view class="i-row">
+      <text class="i-k">咨询地点</text>
+      <text class="i-v">继教院 3406 办公室</text>
+    </view>
+    <view class="i-row">
+      <text class="i-k">联系电话</text>
+      <text class="i-v num" bindtap="onCallPhone">56700015</text>
+    </view>
+  </view>
+</view>

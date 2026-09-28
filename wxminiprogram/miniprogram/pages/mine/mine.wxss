@@ -1,0 +1,135 @@
+.mine-page {
+  min-height: 100vh;
+  background: var(--bg);
+  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+}
+
+.warm-theme {
+  --accent: #c2410c;
+  --accent-strong: #9a3412;
+  --accent-soft: #ffedd5;
+  --accent-line: #fed7aa;
+}
+
+.user-card {
+  padding: 56rpx 40rpx 48rpx;
+  border-radius: 0 0 40rpx 40rpx;
+  display: flex;
+  align-items: center;
+}
+
+.user-card.logged {
+  background: var(--accent);
+  box-shadow: 0 8rpx 28rpx -8rpx var(--accent);
+}
+
+.user-card.unlogged {
+  background: var(--neutral);
+  box-shadow: 0 8rpx 28rpx -8rpx rgba(0, 0, 0, 0.2);
+}
+
+.user-avatar {
+  width: 116rpx;
+  height: 116rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  border: 3rpx solid rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44rpx;
+  color: #fff;
+  font-weight: 700;
+  margin-right: 28rpx;
+  flex-shrink: 0;
+}
+
+.user-info { flex: 1; }
+
+.user-name {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 8rpx;
+}
+
+.user-phone {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.user-idcard {
+  font-size: 23rpx;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 6rpx;
+}
+
+.menu-card {
+  margin: 24rpx;
+  background: var(--surface);
+  border-radius: var(--r-card);
+  overflow: hidden;
+  box-shadow: var(--shadow-1);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 30rpx 28rpx;
+  border-bottom: 1rpx solid var(--line);
+}
+
+.menu-item:last-child { border-bottom: none; }
+.menu-item { transition: background-color var(--dur-fast, 150ms) ease; }
+.menu-item:active { background: var(--surface-2); }
+
+.menu-ic-wrap {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 16rpx;
+  background: var(--neutral-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 20rpx;
+}
+
+.menu-ic-wrap .ic {
+  width: 32rpx;
+  height: 32rpx;
+}
+
+.menu-text {
+  flex: 1;
+  font-size: 30rpx;
+  font-weight: 550;
+  color: var(--ink);
+}
+
+.menu-arrow {
+  width: 28rpx;
+  height: 28rpx;
+}
+
+.contact-card {
+  margin: 0 24rpx 40rpx;
+  background: var(--surface);
+  border-radius: var(--r-card);
+  padding: 30rpx;
+  box-shadow: var(--shadow-1);
+}
+
+.contact-title {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 16rpx;
+}
+
+.ct-ic {
+  width: 32rpx;
+  height: 32rpx;
+}

@@ -5,12 +5,11 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
-const http = require('http');
 const crypto = require('crypto');
 
 // 读取配置
 const configPath = path.join(__dirname, 'config.json');
-let config = { env: 'cloud1-d6gio7v8iff39bab7', secretId: '', secretKey: '', appId: '', appSecret: '' };
+let config = { env: 'cloud1-d6gio7v8iff39bab7', secretId: '', secretKey: '', appId: '', appSecret: '', adminApiSecret: '' };
 if (fs.existsSync(configPath)) {
   config = { ...config, ...JSON.parse(fs.readFileSync(configPath, 'utf8')) };
 }
@@ -23,6 +22,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ====== 登录 Token（HMAC，无第三方依赖） ======
 const TOKEN_TTL = 7 * 24 * 60 * 60 * 1000; // 7 天
 const secretPath = path.join(__dirname, '.token-secret');
+const tokenStatePath = path.join(__dirname, '.token-state.json');
 let TOKEN_SECRET;
 if (fs.existsSync(secretPath)) {
   TOKEN_SECRET = fs.readFileSync(secretPath, 'utf8').trim();
@@ -31,8 +31,20 @@ if (fs.existsSync(secretPath)) {
   fs.writeFileSync(secretPath, TOKEN_SECRET, 'utf8');
 }
 
+// 每个账号最近一次改密时间：改密后签发的旧 token 全部失效
+function loadTokenState() {
+  try { return JSON.parse(fs.readFileSync(tokenStatePath, 'utf8')); } catch (e) { return {}; }
+}
+function setTokenNotBefore(phone) {
+  try {
+    const state = loadTokenState();
+    state[phone] = Date.now();
+    fs.writeFileSync(tokenStatePath, JSON.stringify(state), 'utf8');
+  } catch (e) {}
+}
+
 function signToken(payload) {
-  const body = Buffer.from(JSON.stringify({ ...payload, exp: Date.now() + TOKEN_TTL })).toString('base64url');
+  const body = Buffer.from(JSON.stringify({ ...payload, iat: Date.now(), exp: Date.now() + TOKEN_TTL })).toString('base64url');
   const sig = crypto.createHmac('sha256', TOKEN_SECRET).update(body).digest('base64url');
   return body + '.' + sig;
 }
@@ -45,6 +57,8 @@ function verifyToken(token) {
   try {
     const data = JSON.parse(Buffer.from(body, 'base64url').toString());
     if (!data.exp || data.exp < Date.now()) return null;
+    const state = loadTokenState();
+    if (data.phone && state[data.phone] && (data.iat || 0) < state[data.phone]) return null;
     return data;
   } catch (e) { return null; }
 }
@@ -55,6 +69,13 @@ function requireAuth(req, res, next) {
   const payload = verifyToken(token);
   if (!payload) return res.status(401).json({ success: false, message: '未登录或登录已过期' });
   req.admin = payload;
+  next();
+}
+
+function requireSuperadmin(req, res, next) {
+  if (!req.admin || req.admin.role !== 'superadmin') {
+    return res.status(403).json({ success: false, message: '需要超级管理员权限' });
+  }
   next();
 }
 
@@ -69,18 +90,27 @@ app.use('/api', (req, res, next) => {
 const upload = multer({ dest: 'uploads/' });
 if (!fs.existsSync(path.join(__dirname, 'uploads'))) fs.mkdirSync(path.join(__dirname, 'uploads'));
 
-// ====== 本地管理员数据 ======
-const adminsPath = path.join(__dirname, 'admins.json');
-function loadAdmins() {
-  if (fs.existsSync(adminsPath)) return JSON.parse(fs.readFileSync(adminsPath, 'utf8'));
-  const defaults = [{ id: 'admin-default', name: '系统管理员', phone: 'admin', password: 'admin123', role: 'superadmin', createdAt: new Date().toISOString() }];
-  fs.writeFileSync(adminsPath, JSON.stringify(defaults, null, 2), 'utf8');
-  return defaults;
+// ====== 登录限速（服务端） ======
+const loginAttempts = new Map();
+function loginRateLimited(key) {
+  const now = Date.now();
+  const rec = loginAttempts.get(key);
+  if (!rec) return false;
+  if (rec.until > now) return true;
+  if (now - rec.first > 10 * 60 * 1000) { loginAttempts.delete(key); return false; }
+  return rec.count >= 5 && rec.until > now;
 }
-function saveAdmins(admins) {
-  fs.writeFileSync(adminsPath, JSON.stringify(admins, null, 2), 'utf8');
+function recordLoginFail(key) {
+  const now = Date.now();
+  const rec = loginAttempts.get(key);
+  if (!rec || now - rec.first > 10 * 60 * 1000) {
+    loginAttempts.set(key, { count: 1, first: now, until: 0 });
+    return;
+  }
+  rec.count++;
+  if (rec.count >= 5) rec.until = now + 10 * 60 * 1000;
 }
-loadAdmins();
+function clearLoginFails(key) { loginAttempts.delete(key); }
 
 // ====== 云函数调用封装 ======
 let accessToken = '';
@@ -102,9 +132,12 @@ async function getAccessToken() {
 }
 
 async function callCloudFunction(action, params = {}) {
+  if (!config.adminApiSecret) {
+    throw new Error('未配置 adminApiSecret：请在 config.json 中设置与云函数环境变量 ADMIN_API_SECRET 一致的值');
+  }
   const token = await getAccessToken();
   const url = `https://api.weixin.qq.com/tcb/invokecloudfunction?access_token=${token}&env=${config.env}&name=adminApi`;
-  const body = JSON.stringify({ action, ...params });
+  const body = JSON.stringify({ action, secret: config.adminApiSecret, ...params });
   const result = await httpPost(url, body);
   // 云函数返回格式可能是 resp_data 或 response
   const respData = result.resp_data || result.response;
@@ -146,69 +179,116 @@ function httpPost(url, body) {
   });
 }
 
-// ====== 管理员登录 ======
+// ====== 管理员登录（代理云函数，密码仅在云端校验） ======
 app.post('/api/admin/login', async (req, res) => {
   const { phone, password } = req.body;
   if (!phone || !password) return res.json({ success: false, message: '请输入账号和密码' });
-  const admins = loadAdmins();
-  const admin = admins.find(a => a.phone === phone && a.password === password);
-  if (admin) {
-    const token = signToken({ phone: admin.phone, name: admin.name, role: admin.role || 'admin' });
-    return res.json({ success: true, data: { name: admin.name, phone: admin.phone, role: admin.role, classes: admin.classes || [], token } });
+  const limiterKey = String(req.ip || '') + '|' + phone;
+  if (loginRateLimited(limiterKey)) {
+    return res.json({ success: false, message: '尝试次数过多，请10分钟后再试' });
   }
-  res.json({ success: false, message: '账号或密码错误' });
+  try {
+    const result = await callCloudFunction('loginAdmin', { data: { phone, password } });
+    if (!result || !result.success) {
+      recordLoginFail(limiterKey);
+      return res.json({ success: false, message: (result && result.message) || '账号或密码错误' });
+    }
+    clearLoginFails(limiterKey);
+    const admin = result.data;
+    const token = signToken({
+      phone: admin.phone,
+      name: admin.name,
+      role: admin.role || 'admin',
+      classes: admin.classes || [],
+      mustChangePassword: !!admin.mustChangePassword
+    });
+    return res.json({
+      success: true,
+      data: { name: admin.name, phone: admin.phone, role: admin.role, classes: admin.classes || [], mustChangePassword: !!admin.mustChangePassword, token }
+    });
+  } catch (err) {
+    res.json({ success: false, message: err.message });
+  }
 });
 
 // ====== 当前登录管理员（会话校验） ======
 app.get('/api/admin/me', (req, res) => {
-  const { phone, name, role } = req.admin;
-  const admin = loadAdmins().find(a => a.phone === phone);
-  if (!admin) return res.status(401).json({ success: false, message: '账号不存在' });
-  res.json({ success: true, data: { name: admin.name, phone: admin.phone, role: admin.role, classes: admin.classes || [] } });
+  const { phone, name, role, classes, mustChangePassword } = req.admin;
+  res.json({ success: true, data: { name, phone, role, classes: classes || [], mustChangePassword: !!mustChangePassword } });
 });
 
-// ====== 管理员管理 ======
-app.get('/api/admins', (req, res) => {
-  const admins = loadAdmins().map(({ password, ...rest }) => rest);
-  res.json({ success: true, data: admins });
+// ====== 修改当前管理员密码（代理云函数，改密后旧 token 全部失效） ======
+app.post('/api/admin/change-password', async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  if (!oldPassword || !newPassword) return res.json({ success: false, message: '请填写完整信息' });
+  if (String(newPassword).length < 8) return res.json({ success: false, message: '新密码至少8位' });
+  try {
+    const result = await callCloudFunction('changeAdminPassword', {
+      data: { phone: req.admin.phone, oldPassword, newPassword }
+    });
+    if (!result || !result.success) return res.json(result || { success: false, message: '修改失败' });
+    setTokenNotBefore(req.admin.phone);
+    const token = signToken({
+      phone: req.admin.phone,
+      name: req.admin.name,
+      role: req.admin.role || 'admin',
+      classes: req.admin.classes || [],
+      mustChangePassword: false
+    });
+    res.json({ success: true, message: result.message || '密码修改成功', data: { token } });
+  } catch (err) {
+    res.json({ success: false, message: err.message });
+  }
 });
 
-app.post('/api/admins', (req, res) => {
-  const { name, phone, password, role, classes } = req.body;
-  if (!name || !phone || !password) return res.json({ success: false, message: '请填写所有字段' });
-  const admins = loadAdmins();
-  if (admins.find(a => a.phone === phone)) return res.json({ success: false, message: '该账号已存在' });
-  admins.push({ id: 'admin-' + Date.now(), name, phone, password, role: role || 'admin', classes: classes || [], createdAt: new Date().toISOString() });
-  saveAdmins(admins);
-  res.json({ success: true, message: '添加成功' });
+// ====== 管理员管理（数据统一存云端 admins 集合，需超管权限） ======
+app.get('/api/admins', async (req, res) => {
+  try {
+    const result = await callCloudFunction('getAdmins');
+    res.json(result);
+  } catch (err) {
+    res.json({ success: false, message: err.message });
+  }
 });
 
-app.put('/api/admins/:id', (req, res) => {
-  const admins = loadAdmins();
-  const idx = admins.findIndex(a => a.id === req.params.id);
-  if (idx < 0) return res.json({ success: false, message: '管理员不存在' });
-  const { name, phone, password, role, classes } = req.body;
-  admins[idx].name = name || admins[idx].name;
-  admins[idx].phone = phone || admins[idx].phone;
-  if (password) admins[idx].password = password;
-  if (role) admins[idx].role = role;
-  if (classes !== undefined) admins[idx].classes = classes;
-  saveAdmins(admins);
-  res.json({ success: true, message: '更新成功' });
+app.post('/api/admins', requireSuperadmin, async (req, res) => {
+  try {
+    const result = await callCloudFunction('addAdmin', { data: req.body });
+    res.json(result);
+  } catch (err) {
+    res.json({ success: false, message: err.message });
+  }
 });
 
-app.delete('/api/admins/:id', (req, res) => {
-  const admins = loadAdmins();
-  const target = admins.find(a => a.id === req.params.id);
-  if (target && target.phone === 'admin') return res.json({ success: false, message: '不能删除默认管理员' });
-  if (target && req.admin && target.phone === req.admin.phone) return res.json({ success: false, message: '不能删除自己的账号' });
-  const filtered = admins.filter(a => a.id !== req.params.id);
-  if (filtered.length === admins.length) return res.json({ success: false, message: '管理员不存在' });
-  saveAdmins(filtered);
-  res.json({ success: true, message: '删除成功' });
+app.put('/api/admins/:id', requireSuperadmin, async (req, res) => {
+  try {
+    const result = await callCloudFunction('updateAdmin', { data: { _id: req.params.id, ...req.body } });
+    if (result && result.success) {
+      // 改了自己或改了密码：本地旧 token 一并失效
+      const targetPhone = (req.body && req.body.phone) || req.admin.phone;
+      if (targetPhone === req.admin.phone && (req.body.password || req.body.phone)) setTokenNotBefore(req.admin.phone);
+    }
+    res.json(result);
+  } catch (err) {
+    res.json({ success: false, message: err.message });
+  }
 });
 
-app.post('/api/admins/init', async (req, res) => {
+app.delete('/api/admins/:id', requireSuperadmin, async (req, res) => {
+  try {
+    const list = await callCloudFunction('getAdmins');
+    const target = (list && list.data || []).find(a => a._id === req.params.id);
+    if (target && target.phone === req.admin.phone) {
+      return res.json({ success: false, message: '不能删除自己的账号' });
+    }
+    const result = await callCloudFunction('deleteAdmin', { id: req.params.id });
+    res.json(result);
+  } catch (err) {
+    res.json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/admins/init', requireSuperadmin, async (req, res) => {
   try {
     const result = await callCloudFunction('initDefaultAdmin');
     res.json(result);
@@ -320,6 +400,8 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
     res.json({ success: true, data: { total: jsonData.length, added, updated, failed, errors } });
   } catch (err) {
     res.json({ success: false, message: err.message });
+  } finally {
+    if (req.file) { try { fs.unlinkSync(req.file.path); } catch (e) {} }
   }
 });
 
@@ -604,10 +686,11 @@ app.post('/api/admins/import', upload.single('file'), async (req, res) => {
       };
     });
     const result = await callCloudFunction('importAdmins', { data: { admins } });
-    fs.unlinkSync(req.file.path);
     res.json(result);
   } catch (err) {
     res.json({ success: false, message: err.message });
+  } finally {
+    if (req.file) { try { fs.unlinkSync(req.file.path); } catch (e) {} }
   }
 });
 
@@ -621,7 +704,11 @@ app.listen(PORT, async () => {
   console.log('');
   console.log('  打开浏览器访问: http://localhost:' + PORT);
   console.log('');
-  console.log('  默认管理员: admin / admin123');
+  if (!config.adminApiSecret) {
+    console.log('  ❌ 未配置 adminApiSecret：登录等接口将全部失败');
+    console.log('     请在 config.json 中补充 adminApiSecret（与云函数 ADMIN_API_SECRET 一致）');
+  }
+  console.log('  提示: 默认账号 admin/admin123 首次登录会强制修改密码');
   console.log('');
   console.log('==========================================');
 

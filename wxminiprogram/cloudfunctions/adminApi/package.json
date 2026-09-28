@@ -1,0 +1,10 @@
+{
+  "name": "adminApi",
+  "version": "1.0.0",
+  "description": "管理后台统一API",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3",
+    "xlsx": "^0.18.5"
+  }
+}
