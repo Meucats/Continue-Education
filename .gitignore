@@ -13,6 +13,7 @@ webadmin/admin-server/uploads/
 admin-server/data/
 admin-server/uploads/
 uploads/
+**/scripts/out/
 package-lock.json
 webadmin/.env
 .env

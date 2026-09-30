@@ -18,7 +18,7 @@ const PRELOGIN_ACTIONS = new Set(['changeAdminPassword']);
 // 学员会话可访问的 action
 const STUDENT_ACTIONS = new Set(['getStudentSelf', 'getMyRequests', 'upsertMyUser']);
 // 仅超管（或服务端）可访问
-const SUPERADMIN_ACTIONS = new Set(['addAdmin', 'updateAdmin', 'deleteAdmin', 'resetAdminPassword', 'importAdmins', 'initDefaultAdmin']);
+const SUPERADMIN_ACTIONS = new Set(['addAdmin', 'updateAdmin', 'deleteAdmin', 'resetAdminPassword', 'importAdmins', 'initDefaultAdmin', 'exportAll']);
 
 // 登录限速（按实例内存，尽力而为）
 const attempts = new Map();
@@ -762,6 +762,27 @@ exports.main = async (event, context) => {
         }
       }
       return { success: true, data: { total: adminList.length, added: addedA, failed: failedA, errors: errorsA } };
+    }
+
+    // ====== 一次性迁移导出（保留至迁移完全完成、云退役确认后再删除）======
+    case 'exportAll': {
+      async function dumpAll(coll) {
+        const all = [];
+        let skip = 0;
+        for (;;) {
+          const r = await db.collection(coll).skip(skip).limit(100).get();
+          all.push(...r.data);
+          if (r.data.length < 100) break;
+          skip += r.data.length;
+        }
+        return all;
+      }
+      const out = {};
+      for (const c of ['students', 'admins', 'entry_requests', 'users', 'tips']) {
+        out[c] = await dumpAll(c);
+      }
+      out._exportedAt = new Date();
+      return { success: true, data: out };
     }
 
     default:

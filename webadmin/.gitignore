@@ -5,4 +5,5 @@ uploads/
 admin-server/config.json
 admin-server/admins.json
 admin-server/data/
+admin-server/scripts/out/
 admin-server/.token-secret
