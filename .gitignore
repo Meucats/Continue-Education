@@ -14,7 +14,6 @@ admin-server/data/
 admin-server/uploads/
 uploads/
 **/scripts/out/
-package-lock.json
 webadmin/.env
 .env
 .env.*
@@ -38,3 +37,6 @@ __pycache__/
 新建 文本文档.txt
 wxminiprogram/project.private.config.json
 **/~$*
+
+# 改版前 HTML 备份（本地回滚用，不入库）
+webadmin/admin-server/backups/

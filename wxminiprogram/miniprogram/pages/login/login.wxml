@@ -35,7 +35,7 @@
 <view class="modal-mask m-mask-enter" wx:if="{{showPasswordModal}}" catchtouchmove="true">
   <view class="modal-box m-modal-enter">
     <view class="modal-title">修改初始密码</view>
-    <view class="modal-desc">首次登录请修改密码</view>
+    <view class="modal-desc">{{pendingStudent ? '首次登录必须修改密码后才能进入系统' : '首次登录请修改密码'}}</view>
     <view class="modal-input-group">
       <input class="modal-input" password placeholder="请输入原密码" placeholder-class="ph" value="{{changeOldPwd}}" bindinput="onOldPwdInput" />
     </view>
@@ -53,7 +53,7 @@
       <text class="{{changeNewPwd === changeConfirmPwd ? 'match-ok' : 'match-no'}}">{{changeNewPwd === changeConfirmPwd ? '密码一致' : '密码不一致'}}</text>
     </view>
     <view class="modal-btns">
-      <button class="modal-btn cancel" bindtap="onCancelPassword">取消</button>
+      <button class="modal-btn cancel" wx:if="{{pendingAdmin}}" bindtap="onCancelPassword">返回登录</button>
       <button class="modal-btn confirm" bindtap="onSubmitPassword">确认修改</button>
     </view>
   </view>

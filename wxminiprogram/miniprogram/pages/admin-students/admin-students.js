@@ -78,7 +78,7 @@ Page({
     const { id, name } = e.currentTarget.dataset;
     wx.showModal({
       title: '重置密码',
-      content: `确定要重置「${name}」的密码吗？\n重置后密码为身份证后6位。`,
+        content: `确定要重置「${name}」的密码吗？\n重置后密码为身份证后6位（无身份证则为手机号后6位）。`,
       success: (res) => {
         if (res.confirm) {
           wx.showLoading({ title: '重置中...' });

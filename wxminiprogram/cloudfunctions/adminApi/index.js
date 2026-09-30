@@ -4,6 +4,7 @@ const crypto = require('crypto');
 cloud.init({ env: 'cloud1-d6gio7v8iff39bab7' });
 const db = cloud.database();
 const _ = db.command;
+const $ = db.command.aggregate;
 
 // ====== 鉴权配置 ======
 // 服务端调用方（admin-server / Cloudflare Worker）需携带 secret（云函数环境变量 ADMIN_API_SECRET）
@@ -20,27 +21,58 @@ const STUDENT_ACTIONS = new Set(['getStudentSelf', 'getMyRequests', 'upsertMyUse
 // 仅超管（或服务端）可访问
 const SUPERADMIN_ACTIONS = new Set(['addAdmin', 'updateAdmin', 'deleteAdmin', 'resetAdminPassword', 'importAdmins', 'initDefaultAdmin', 'exportAll']);
 
-// 登录限速（按实例内存，尽力而为）
-const attempts = new Map();
-function rateLimited(key) {
-  const now = Date.now();
-  const rec = attempts.get(key);
-  if (!rec) return false;
-  if (rec.until > now) return true;
-  if (now - rec.first > 10 * 60 * 1000) { attempts.delete(key); return false; }
-  return rec.count >= 5 && rec.until > now;
+// 登录/改密限速（复审 #9：持久化到 rate_limits 集合 —— 多实例共享、重启不清零，无需 Redis）
+// 阈值：10 分钟窗口内失败 5 次 → 锁定 10 分钟；过期记录在下次命中时懒清理
+// 并发写为读-改写（极端并发可能少计一次失败，属可接受的尽力而为）
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+const RATE_MAX_FAILS = 5;
+let rateCollReady = false;
+async function ensureRateColl() {
+  if (rateCollReady) return;
+  await db.createCollection('rate_limits').catch(() => {});
+  rateCollReady = true;
 }
-function recordFail(key) {
-  const now = Date.now();
-  const rec = attempts.get(key);
-  if (!rec || now - rec.first > 10 * 60 * 1000) {
-    attempts.set(key, { count: 1, first: now, until: 0 });
-    return;
+function rateDocId(key) {
+  // 云数据库 _id 只允许字母数字_-()@$.，其余字符转义，保证同一 key 稳定映射
+  return String(key).replace(/[^A-Za-z0-9_\-()@$.]/g, c => '_' + c.charCodeAt(0));
+}
+async function rateLimited(key) {
+  try {
+    await ensureRateColl();
+    const id = rateDocId(key);
+    const r = await db.collection('rate_limits').doc(id).get().catch(() => null);
+    const rec = r && r.data;
+    if (!rec) return false;
+    const now = Date.now();
+    if (rec.until > now) return true;
+    if (now - rec.first > RATE_WINDOW_MS) await db.collection('rate_limits').doc(id).remove().catch(() => {});
+    return false;
+  } catch (e) {
+    return false; // 限速存储异常不阻断登录（可用性优先）
   }
-  rec.count++;
-  if (rec.count >= 5) rec.until = now + 10 * 60 * 1000;
 }
-function clearFails(key) { attempts.delete(key); }
+async function recordFail(key) {
+  try {
+    await ensureRateColl();
+    const now = Date.now();
+    const id = rateDocId(key);
+    const r = await db.collection('rate_limits').doc(id).get().catch(() => null);
+    let rec = r && r.data;
+    if (!rec || now - rec.first > RATE_WINDOW_MS) {
+      rec = { count: 1, first: now, until: 0 };
+    } else {
+      rec.count++;
+      if (rec.count >= RATE_MAX_FAILS) rec.until = now + RATE_WINDOW_MS;
+    }
+    await db.collection('rate_limits').doc(id).set({ data: rec });
+  } catch (e) { /* 记录失败不阻断主流程 */ }
+}
+async function clearFails(key) {
+  try {
+    await ensureRateColl();
+    await db.collection('rate_limits').doc(rateDocId(key)).remove().catch(() => {});
+  } catch (e) { /* 清理失败可容忍 */ }
+}
 
 // ====== 密码哈希（scrypt，兼容旧明文） ======
 function hashPassword(pwd) {
@@ -72,6 +104,10 @@ async function createSession(payload) {
   await db.collection('sessions').add({
     data: { token, ...payload, expiresAt: Date.now() + TOKEN_TTL, createdAt: new Date() }
   });
+  // 约 5% 概率顺手清理过期会话，避免 sessions 集合无限膨胀（#14）
+  if (Math.random() < 0.05) {
+    db.collection('sessions').where({ expiresAt: db.command.lt(Date.now()) }).remove().catch(() => {});
+  }
   return token;
 }
 async function getSession(token) {
@@ -82,6 +118,16 @@ async function getSession(token) {
   if (!s.expiresAt || s.expiresAt < Date.now()) {
     await db.collection('sessions').doc(s._id).remove().catch(() => {});
     return null;
+  }
+  if (s.type === 'admin') {
+    // 角色/负责班级以 admins 表为准实时刷新：改权限后无需等会话过期（班级隔离依赖此项）
+    try {
+      const a = await db.collection('admins').where({ phone: s.phone }).limit(1).get();
+      if (a.data[0]) {
+        s.role = a.data[0].role || 'admin';
+        s.classes = a.data[0].classes || [];
+      }
+    } catch (e) { /* 读取失败时沿用会话内缓存 */ }
   }
   return s;
 }
@@ -109,11 +155,54 @@ function isRequestExpired(r) {
   return Date.now() > new Date(endStr).getTime();
 }
 
+// 计时安全字符串比较（用于 secret 比对）
+function safeStrEqual(a, b) {
+  const ba = Buffer.from(String(a || ''));
+  const bb = Buffer.from(String(b || ''));
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+}
+
+// 班级隔离身份：小程序端取会话，Web 端由 Express 从登录态透传 actorRole/actorClasses。
+// 豁免只认 role==='superadmin'，绝不因 secret 放行；无身份信息（服务端内部 secret 调用）不过滤。
+function getActor(event, session) {
+  if (session && session.type === 'admin') {
+    return { role: session.role || 'admin', classes: Array.isArray(session.classes) ? session.classes : [] };
+  }
+  const r = event.actorRole;
+  if (r) {
+    const c = event.actorClasses;
+    return { role: r, classes: Array.isArray(c) ? c : (typeof c === 'string' && c ? c.split(/[,，\s]+/) : []) };
+  }
+  return null;
+}
+function classFiltered(actor) {
+  return !!(actor && actor.role !== 'superadmin' && Array.isArray(actor.classes) && actor.classes.length > 0);
+}
+
+// ====== 统计辅助（复审 #7：用 count/aggregate 代替全量拉内存） ======
+async function countOf(coll, where) {
+  let q = db.collection(coll);
+  if (where) q = q.where(where);
+  const r = await q.count();
+  return r.total;
+}
+// 班级名单（超管全量场景）：aggregate group 无 1000 上限；失败回退字段裁剪拉取
+async function classNamesAggregate() {
+  try {
+    const res = await db.collection('students').aggregate().group({ _id: '$className', n: $.sum(1) }).end();
+    return res.data.map(g => g._id).filter(Boolean).sort();
+  } catch (e) {
+    const r = await db.collection('students').field({ className: true }).limit(1000).get();
+    return [...new Set(r.data.map(s => s.className).filter(Boolean))];
+  }
+}
+
 exports.main = async (event, context) => {
   const { action, data, id, status, reason, keyword, token, secret } = event;
 
   // ====== 调用方鉴权 ======
-  const secretOk = !!(SERVER_SECRET && typeof secret === 'string' && secret === SERVER_SECRET);
+  const secretOk = !!(SERVER_SECRET && typeof secret === 'string' && safeStrEqual(secret, SERVER_SECRET));
   let session = await getSession(token);
   if (PRELOGIN_ACTIONS.has(action)) {
     // 登录前改密：无会话时必须提供 phone+原密码（有限速），有会话时用会话身份
@@ -145,19 +234,24 @@ exports.main = async (event, context) => {
   switch (action) {
     // ====== 学员管理 ======
     case 'getStudents': {
-      let query = db.collection('students');
+      const actor = getActor(event, session);
+      const conds = [];
+      if (classFiltered(actor)) conds.push({ className: _.in(actor.classes) });
       if (keyword) {
         const reg = db.RegExp({ regexp: escapeRegex(keyword), options: 'i' });
-        query = query.where(_.or([
+        conds.push(_.or([
           { name: reg },
           { phone: reg },
           { className: reg }
         ]));
       }
+      let query = db.collection('students');
+      if (conds.length === 1) query = query.where(conds[0]);
+      else if (conds.length > 1) query = query.where(_.and(conds));
       const count = await query.count();
       const limit = Math.min(count.total, 1000);
       const result = await query.orderBy('createdAt', 'desc').limit(limit).get();
-      return { success: true, data: result.data.map(stripSecrets), total: count.total };
+      return { success: true, data: result.data.map(stripSecrets), total: count.total, truncated: result.data.length < count.total };
     }
 
     case 'getStudent': {
@@ -206,8 +300,13 @@ exports.main = async (event, context) => {
     case 'batchDeleteStudents': {
       const { ids } = data;
       if (!ids || ids.length === 0) return { success: false, message: '请选择要删除的学员' };
-      for (const id of ids) {
-        await db.collection('students').doc(id).remove();
+      try {
+        // 一条语句批量删（复审 #7）；个别环境不支持 _id + _.in 时回退逐条删
+        await db.collection('students').where({ _id: _.in(ids) }).remove();
+      } catch (e) {
+        for (const id of ids) {
+          await db.collection('students').doc(id).remove();
+        }
       }
       return { success: true, message: `成功删除 ${ids.length} 名学员` };
     }
@@ -235,15 +334,15 @@ exports.main = async (event, context) => {
       if (!stuPhone || !oldPassword || !newPassword) return { success: false, message: '请填写完整信息' };
       if (newPassword.length < 6) return { success: false, message: '新密码至少6位' };
       const limiterKey = 'pwd:' + stuPhone;
-      if (rateLimited(limiterKey)) return { success: false, message: '尝试次数过多，请10分钟后再试' };
+      if (await rateLimited(limiterKey)) return { success: false, message: '尝试次数过多，请10分钟后再试' };
       const stuRes = await db.collection('students').where({ phone: stuPhone }).get();
       if (stuRes.data.length === 0) return { success: false, message: '学员不存在' };
       const stuData = stuRes.data[0];
       if (!verifyPassword(stuData.password, oldPassword)) {
-        recordFail(limiterKey);
+        await recordFail(limiterKey);
         return { success: false, message: '原密码错误' };
       }
-      clearFails(limiterKey);
+      await clearFails(limiterKey);
       await db.collection('students').doc(stuData._id).update({
         data: { password: hashPassword(newPassword), mustChangePassword: false }
       });
@@ -259,15 +358,15 @@ exports.main = async (event, context) => {
       if (!aPhone || !oldPassword || !newPassword) return { success: false, message: '请填写完整信息' };
       if (newPassword.length < 8) return { success: false, message: '新密码至少8位' };
       const limiterKey = 'apwd:' + aPhone;
-      if (rateLimited(limiterKey)) return { success: false, message: '尝试次数过多，请10分钟后再试' };
+      if (await rateLimited(limiterKey)) return { success: false, message: '尝试次数过多，请10分钟后再试' };
       const adminRes = await db.collection('admins').where({ phone: aPhone }).get();
       if (adminRes.data.length === 0) return { success: false, message: '账号不存在' };
       const adminDoc = adminRes.data[0];
       if (!verifyPassword(adminDoc.password, oldPassword)) {
-        recordFail(limiterKey);
+        await recordFail(limiterKey);
         return { success: false, message: '原密码错误' };
       }
-      clearFails(limiterKey);
+      await clearFails(limiterKey);
       await db.collection('admins').doc(adminDoc._id).update({
         data: { password: hashPassword(newPassword), mustChangePassword: false, updatedAt: new Date() }
       });
@@ -280,7 +379,7 @@ exports.main = async (event, context) => {
       const { phone: aPhone, password: aPwd } = data || {};
       if (!aPhone || !aPwd) return { success: false, message: '请输入账号和密码' };
       const limiterKey = 'admin:' + aPhone;
-      if (rateLimited(limiterKey)) return { success: false, message: '尝试次数过多，请10分钟后再试' };
+      if (await rateLimited(limiterKey)) return { success: false, message: '尝试次数过多，请10分钟后再试' };
       let adminRes = await db.collection('admins').where({ phone: aPhone }).limit(1).get();
       // 首次部署引导：admins 集合为空时，用初始账号 admin/admin123 创建默认管理员（强制改密）
       if (adminRes.data.length === 0) {
@@ -293,20 +392,21 @@ exports.main = async (event, context) => {
         }
       }
       if (adminRes.data.length === 0 || !verifyPassword(adminRes.data[0].password, aPwd)) {
-        recordFail(limiterKey);
+        await recordFail(limiterKey);
         return { success: false, message: '账号或密码错误' };
       }
-      clearFails(limiterKey);
+      await clearFails(limiterKey);
       const admin = adminRes.data[0];
       if (needsRehash(admin.password)) {
         await db.collection('admins').doc(admin._id).update({ data: { password: hashPassword(aPwd) } });
       }
-      // 超管不强制改密（普通管理员由超管直接设置初始密码，重置密码后仍需首登改密）
-      const mustChange = !!admin.mustChangePassword && (admin.role || 'admin') !== 'superadmin';
-      const t = await createSession({ type: 'admin', phone: admin.phone, name: admin.name, role: admin.role || 'admin', mustChangePassword: mustChange });
+      // 普通管理员首登强制改密；超管豁免。唯一例外：默认账号 admin 仍强制一次（部署后立即改默认口令的加固）
+      const role = admin.role || 'admin';
+      const mustChange = !!admin.mustChangePassword && (role !== 'superadmin' || admin.phone === 'admin');
+      const t = await createSession({ type: 'admin', phone: admin.phone, name: admin.name, role, classes: admin.classes || [], mustChangePassword: mustChange });
       return {
         success: true,
-        data: { _id: admin._id, name: admin.name, phone: admin.phone, role: admin.role || 'admin', classes: admin.classes || [], mustChangePassword: mustChange, token: t }
+        data: { _id: admin._id, name: admin.name, phone: admin.phone, role, classes: admin.classes || [], mustChangePassword: mustChange, token: t }
       };
     }
 
@@ -314,19 +414,20 @@ exports.main = async (event, context) => {
       const { phone: sPhone, password: sPwd } = data || {};
       if (!sPhone || !sPwd) return { success: false, message: '请输入账号和密码' };
       const limiterKey = 'stu:' + sPhone;
-      if (rateLimited(limiterKey)) return { success: false, message: '尝试次数过多，请10分钟后再试' };
+      if (await rateLimited(limiterKey)) return { success: false, message: '尝试次数过多，请10分钟后再试' };
       const stuRes = await db.collection('students').where({ phone: sPhone }).limit(1).get();
       const stu = stuRes.data[0];
       if (!stu) {
         return { success: false, message: '未找到学员信息，请先咨询报名' };
       }
-      // 无密码字段时默认手机后6位
-      const stored = (stu.password !== undefined && stu.password !== null && stu.password !== '') ? stu.password : sPhone.slice(-6);
+      // 无密码字段时按初始密码规则回退：身份证后6位，没身份证用手机后6位
+      const legacyPwd = (stu.idCard && stu.idCard.length >= 6) ? stu.idCard.slice(-6) : sPhone.slice(-6);
+      const stored = (stu.password !== undefined && stu.password !== null && stu.password !== '') ? stu.password : legacyPwd;
       if (!verifyPassword(stored, sPwd)) {
-        recordFail(limiterKey);
+        await recordFail(limiterKey);
         return { success: false, message: '账号或密码错误' };
       }
-      clearFails(limiterKey);
+      await clearFails(limiterKey);
       if (needsRehash(stored)) {
         await db.collection('students').doc(stu._id).update({ data: { password: hashPassword(sPwd) } });
       }
@@ -375,12 +476,22 @@ exports.main = async (event, context) => {
 
     // ====== 入校申请 ======
     case 'getRequests': {
-      let query = db.collection('entry_requests');
-      if (status && status !== 'all') {
-        query = query.where({ status });
+      const actor = getActor(event, session);
+      const conds = [];
+      if (status && status !== 'all') conds.push({ status });
+      if (classFiltered(actor)) {
+        // entry_requests 无班级字段：先取本班学生手机号，再按 phone 关联过滤
+        const stuRes = await db.collection('students').where({ className: _.in(actor.classes) }).limit(1000).get();
+        const phones = [...new Set(stuRes.data.map(s => s.phone))];
+        if (phones.length === 0) return { success: true, data: [] };
+        conds.push({ phone: _.in(phones) });
       }
+      let query = db.collection('entry_requests');
+      if (conds.length === 1) query = query.where(conds[0]);
+      else if (conds.length > 1) query = query.where(_.and(conds));
+      const count = await query.count();
       const result = await query.orderBy('createdAt', 'desc').limit(200).get();
-      return { success: true, data: result.data.map(r => ({ ...r, isExpired: isRequestExpired(r) })) };
+      return { success: true, data: result.data.map(r => ({ ...r, isExpired: isRequestExpired(r) })), total: count.total, truncated: result.data.length < count.total };
     }
 
     case 'addRequest': {
@@ -417,8 +528,9 @@ exports.main = async (event, context) => {
 
     // ====== 账户管理 ======
     case 'getAccounts': {
+      const count = await db.collection('users').count();
       const result = await db.collection('users').orderBy('createdAt', 'desc').limit(200).get();
-      return { success: true, data: result.data.map(stripSecrets) };
+      return { success: true, data: result.data.map(stripSecrets), total: count.total, truncated: result.data.length < count.total };
     }
 
     case 'syncAccounts': {
@@ -432,7 +544,7 @@ exports.main = async (event, context) => {
           await db.collection('users').add({
             data: {
               phone: s.phone, name: s.name, role: 'student',
-              password: hashPassword(s.phone.slice(-6)), createdAt: new Date()
+              password: hashPassword((s.idCard && s.idCard.length >= 6) ? s.idCard.slice(-6) : s.phone.slice(-6)), createdAt: new Date()
             }
           });
           count++;
@@ -443,25 +555,63 @@ exports.main = async (event, context) => {
 
     // ====== 统计 ======
     case 'getStats': {
-      const students = (await db.collection('students').limit(1000).get()).data;
-      const requests = (await db.collection('entry_requests').limit(1000).get()).data;
-      const accounts = (await db.collection('users').limit(1000).get()).data;
-      const now = new Date();
-      const today = now.toISOString().slice(0, 10);
-      const classNames = [...new Set(students.map(s => s.className))];
+      const actor = getActor(event, session);
+      const filtered = classFiltered(actor);
+      const today = new Date().toISOString().slice(0, 10);
+      const dayStart = new Date(Date.parse(today + 'T00:00:00.000Z'));
+      const dayEnd = new Date(dayStart.getTime() + 86400000);
+      const createdAtRange = _.and(_.gte(dayStart), _.lt(dayEnd));
+
+      // 班级受限管理员：拉本班学员明细（字段裁剪）做本班口径；超管全量走 count（复审 #7）
+      let students = null;
+      if (filtered) {
+        students = (await db.collection('students')
+          .where({ className: _.in(actor.classes) })
+          .field({ phone: 1, className: 1, deadline: 1, createdAt: 1 })
+          .limit(1000).get()).data;
+      }
+      const studentCount = filtered ? students.length : await countOf('students');
+
+      // 入校申请按状态 count；受限管理员先取本班手机号做关联过滤
+      const reqPhones = filtered ? [...new Set(students.map(s => s.phone))] : null;
+      const reqConds = extra => {
+        const conds = [...(extra || [])];
+        if (filtered) conds.push({ phone: _.in(reqPhones) });
+        return conds.length === 1 ? conds[0] : _.and(...conds);
+      };
+      const pendingRequestCount = await countOf('entry_requests', reqConds([{ status: 'pending' }]));
+      const approvedCount = await countOf('entry_requests', reqConds([{ status: 'approved' }]));
+      const rejectedCount = await countOf('entry_requests', reqConds([{ status: 'rejected' }]));
+      const todayRequests = await countOf('entry_requests', reqConds([{ createdAt: createdAtRange }]));
+
+      let todayStudents, activeStudents, expiredStudents, classNames;
+      if (filtered) {
+        todayStudents = students.filter(s => s.createdAt && new Date(s.createdAt).toISOString().slice(0, 10) === today).length;
+        activeStudents = students.filter(s => s.deadline && s.deadline >= today).length;
+        expiredStudents = students.filter(s => s.deadline && s.deadline < today).length;
+        // 保持原插入顺序（测试矩阵断言顺序）
+        classNames = [...new Set(students.map(s => s.className))];
+      } else {
+        todayStudents = await countOf('students', { createdAt: createdAtRange });
+        // deadline 为 YYYY-MM-DD 字符串，字典序即时间序；排除空串与缺失字段
+        activeStudents = await countOf('students', { deadline: _.gte(today) });
+        expiredStudents = await countOf('students', { deadline: _.and(_.gt(''), _.lt(today)) });
+        classNames = await classNamesAggregate();
+      }
+      const accountCount = await countOf('users');
 
       return {
         success: true,
         data: {
-          studentCount: students.length,
-          pendingRequestCount: requests.filter(r => r.status === 'pending').length,
-          approvedCount: requests.filter(r => r.status === 'approved').length,
-          rejectedCount: requests.filter(r => r.status === 'rejected').length,
-          accountCount: accounts.length,
-          todayStudents: students.filter(s => s.createdAt && new Date(s.createdAt).toISOString().startsWith(today)).length,
-          todayRequests: requests.filter(r => r.createdAt && new Date(r.createdAt).toISOString().startsWith(today)).length,
-          activeStudents: students.filter(s => s.deadline && s.deadline >= today).length,
-          expiredStudents: students.filter(s => s.deadline && s.deadline < today).length,
+          studentCount,
+          pendingRequestCount,
+          approvedCount,
+          rejectedCount,
+          accountCount,
+          todayStudents,
+          todayRequests,
+          activeStudents,
+          expiredStudents,
           classCount: classNames.length,
           classNames
         }
@@ -491,7 +641,9 @@ exports.main = async (event, context) => {
         courseStartDate: ['课程开始日期', '开始日期', '课程开始', 'courseStartDate'],
         courseEndDate: ['课程结束日期', '结束日期', '课程结束', 'courseEndDate'],
         deadline: ['上课截止时间', '截止时间', '截止', 'deadline'],
-        location: ['上课地点', '地点', 'location', '教室']
+        location: ['上课地点', '地点', 'location', '教室'],
+        idCard: ['身份证号', '身份证', '证件号', 'idCard'],
+        company: ['工作单位', '单位', '公司', 'company']
       };
       headers.forEach((h, i) => {
         const header = String(h).trim();
@@ -628,14 +780,28 @@ exports.main = async (event, context) => {
     case 'updateAdmin': {
       const { _id, name: uName, phone: uPhone, password: uPwd, role: uRole, classes: uClasses } = data || {};
       if (!_id) return { success: false, message: '缺少管理员ID' };
-      const updateData = { name: uName, phone: uPhone, role: uRole || 'admin', classes: uClasses || [] };
+      let oldDoc = null;
+      try { const d = await db.collection('admins').doc(_id).get(); oldDoc = d.data || null; } catch (e) { oldDoc = null; }
+      if (!oldDoc) return { success: false, message: '管理员不存在' };
+      const oldPhone = oldDoc.phone;
+      // 局部更新：未传的字段绝不写（否则 `uRole || 'admin'` 会把超管静默降权）
+      const updateData = {};
+      if (uName !== undefined) updateData.name = uName;
+      if (uPhone !== undefined) updateData.phone = uPhone;
+      if (uRole !== undefined) updateData.role = uRole;
+      if (uClasses !== undefined) updateData.classes = uClasses;
       if (uPwd) {
         updateData.password = hashPassword(uPwd);
-        // 超管下发的是临时密码 → 对方下次登录需改密（超管登录时会被豁免）
+        // 超管下发的是临时密码 → 对方下次登录需改密（默认账号 admin 会被强制，其余超管豁免）
         updateData.mustChangePassword = true;
       }
       await db.collection('admins').doc(_id).update({ data: updateData });
-      if (uPwd || uPhone) await revokeSessions(uPhone, 'admin');
+      const phoneChanged = !!(uPhone && oldPhone && uPhone !== oldPhone);
+      if (uPwd || phoneChanged) {
+        // 必须吊销【旧手机号】会话：改号时旧号下的会话全部失效，改密时同号即旧号
+        if (oldPhone) await revokeSessions(oldPhone, 'admin');
+        if (uPwd && phoneChanged && uPhone) await revokeSessions(uPhone, 'admin');
+      }
       return { success: true, message: '更新成功' };
     }
 
@@ -725,7 +891,10 @@ exports.main = async (event, context) => {
     }
 
     case 'getClasses': {
-      const stuRes = await db.collection('students').limit(1000).get();
+      const actor = getActor(event, session);
+      let query = db.collection('students');
+      if (classFiltered(actor)) query = query.where({ className: _.in(actor.classes) });
+      const stuRes = await query.limit(1000).get();
       const cls = [...new Set(stuRes.data.map(s => s.className).filter(Boolean))];
       return { success: true, data: cls };
     }

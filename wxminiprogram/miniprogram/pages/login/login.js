@@ -43,15 +43,15 @@ Page({
       if (res && res.success) {
         const admin = res.data;
         const safeAdmin = { _id: admin._id, phone: admin.phone, name: admin.name, role: admin.role || 'admin', classes: admin.classes || [], token: admin.token };
-        app.globalData.isAdmin = true;
-        app.globalData.adminInfo = safeAdmin;
-        wx.setStorageSync('adminSession', safeAdmin);
         if (admin.mustChangePassword) {
-          // 首次登录强制修改密码
+          // 首次登录强制修改密码；此时不落登录态，杀掉 App 下次登录仍会被拦
           this.setData({ password: '', showPasswordModal: true, pendingAdmin: admin, pendingStudent: null });
           wx.showToast({ title: '请先修改初始密码', icon: 'none' });
           return;
         }
+        app.globalData.isAdmin = true;
+        app.globalData.adminInfo = safeAdmin;
+        wx.setStorageSync('adminSession', safeAdmin);
         wx.reLaunch({ url: '/pages/admin/admin' });
         return;
       }
@@ -106,15 +106,15 @@ Page({
       }
 
       const safe = { _id: student._id, phone: student.phone, name: student.name, role: 'student', token: student.token };
-      app.globalData.userInfo = safe;
-      wx.setStorageSync('userSession', safe);
 
-      // 首次登录需要修改密码
+      // 首次登录需要修改密码：不落登录态（改密不可跳过，杀掉 App 下次登录仍会被拦）
       if (student.mustChangePassword) {
         this.setData({ password: '', showPasswordModal: true, pendingStudent: student, pendingAdmin: null });
         return;
       }
 
+      app.globalData.userInfo = safe;
+      wx.setStorageSync('userSession', safe);
       this.createOrUpdateUser(phone, student.name);
     }).catch(err => {
       wx.hideLoading();
@@ -231,12 +231,13 @@ Page({
   },
 
   onCancelPassword: function () {
-    // 学员可取消（稍后再改）；管理员强制改密不可取消
+    // 学员改密不可跳过（取消按钮已隐藏，改密前不建立登录态）；管理员「返回登录」= 放弃本次登录
     if (this.data.pendingAdmin) {
       app.clearAdminSession();
       this.setData({ showPasswordModal: false, pendingAdmin: null, changeOldPwd: '', changeNewPwd: '', changeConfirmPwd: '' });
       return;
     }
+    // 兜底：即便被误调用，学员也不会带着未改的初始密码进入系统
     this.setData({
       showPasswordModal: false,
       changeOldPwd: '',
@@ -244,7 +245,6 @@ Page({
       changeConfirmPwd: '',
       pendingStudent: null
     });
-    // 学员跳过强制改密 → 不建立登录态，回登录页
     app.clearUserSession();
     this.setData({ password: '' });
   },

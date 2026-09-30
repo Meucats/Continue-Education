@@ -187,8 +187,10 @@ CREATE TABLE tips (
 | 5 | 新增 `POST /api/wx` | server.js | 小程序统一入口：解析 `{action, data, token}` → `dispatch`；鉴权分级复用 dispatcher 内逻辑 |
 | 6 | `/api/import` 响应结构对齐 | server.js:368 | 云函数 `importStudents` 返回平铺 `{success,total,added,updated,failed,errors}`，Express 现包在 `data` 里——**统一为平铺**（见 §8.5） |
 | 7 | 上传鉴权兼容 | server.js:83 | `wx.uploadFile` 走 `Authorization: Bearer` 头，与现逻辑一致即可 |
-| 8 | 依赖 | package.json | `+ mysql2`（保留 express/multer/xlsx/cors） |
+| 8 | 依赖 | package.json | `+ mysql2`（保留 express/multer/xlsx/cors）；`xlsx` 已升 0.20.3（CDN 版，修 CVE-2023-30533） |
 | 9 | 数据源开关 | config.json | `dataSource: "cloud" \| "mysql"`：`mysql` 为终态；保留 `cloud` 分支用于**回滚**（切换初期可一键切回云） |
+| 10 | 列表分页/规模上限 | dispatcher 移植时 | 现云函数 `getStudents` 一次性 limit 1000、`getRequests/getAccounts` limit 200（09-30 已补 `count/total/truncated` 与前端截断提示条，复审 #7 统计侧）；`getStats` 超管已改 `count()`、班级受限走字段裁剪明细聚合（09-30，原「全量拉内存」已除）。P2 移植时给 SQL 加 `LIMIT/OFFSET` 分页并把聚合改写为 `COUNT/GROUP BY`；前端表格若暂不分页则保留现有上限并在超限时提示导出 |
+| 11 | 会话表 TTL 清理 | dispatcher 移植时 | 云侧现状：`getSession` 过期即删 + `createSession` 约 5% 概率顺手清（2026-09-30 已加，复审 #14）；MySQL 侧建 `sessions.expiresAt` 索引，P2 加定时 `DELETE WHERE expires_at < NOW()`（cron 或启动时一次） |
 
 新增文件结构：
 
@@ -286,7 +288,7 @@ T4  观察 24h → 删除云函数/云库/云存储 → 关闭云开发环境（
 | 双写数据分裂 | **不做双写**，采用 §8.4 的单写停机窗口（本系统规模下窗口成本极低） |
 | MySQL 挂了/误删 | 每日 `mysqldump` cron 到同机 + 异地（对象存储/本机）；2核2G 上数据量极小，全量 < 100MB |
 | 密码散列不兼容 | 已确认两端同为 scrypt 格式，**原样搬运**；冒烟登录验证覆盖 |
-| 限速 Map 重启清零 | 可接受（尽力而为语义与云函数一致） |
+| 限速 Map 重启清零 | 云函数侧已迁 `rate_limits` 集合持久化（09-30，阈值不变、异常不阻断，清单 #9）；Express 侧仍内存 Map（弱兜底，重启清零可接受） |
 
 ## 11. 明确不做的事
 
@@ -299,5 +301,14 @@ T4  观察 24h → 删除云函数/云库/云存储 → 关闭云开发环境（
 
 - [ ] 云函数临时 `exportAll` action **保留至迁移完全完成**（新老版本稳定运行、云开发环境正式退役确认无回滚需要）后，再从 `adminApi/index.js` 删除并最后上传一次部署 —— 用户已明确此顺序
 - [ ] 删除 `scripts/export-cloud.js` / `scripts/out/` 旧导出 JSON（含真实身份证手机号）
+- [ ] 云存储 `imports/`（导入的 Excel）、`templates/`（模板文件）等历史文件一并清理（复审 #10：云存储此前只增不删）
 - [ ] `config.json` 清理 `env / appId / appSecret / adminApiSecret`（服务器阶段不再需要微信侧调用）
 - [ ] `dataSource` 开关固定为 `mysql`，移除 `cloud` 分支（回滚窗口关闭后）
+
+## 13. 工程化 backlog（非迁移范围，复审记录）
+
+- `webadmin/admin-server/public/index.html` 拆分（复审/清单 #15）→ **两步走，第一步已完成（09-30 夜）**：样式抽离为 `public/admin.css`（1620 行），index.html 3794 → 2163 行，check-html 覆盖外链与花括号一致性，抽离后登录页/dashboard 冒烟核验无样式损失；JS/结构组件化仍需引入构建工具或原生拆分，另立项
+- 列表分页（复审/清单 #7）→ 云侧统计与截断标记已先行完成（09-30），SQL 分页仍并入 §6 改造清单第 10 项，随 P2 一并做
+- 测试与 CI（清单 #12）→ 已入库（09-30 夜）：`test/e2e-profile.js`、`test/e2e-classmatrix.js`（`ADMIN_PASS/ADMIN_USER/BASE_URL` 环境变量凭据）、`scripts/check-html.js`、`package.json` 的 `check/e2e` 族、`.github/workflows/ci.yml`（零依赖 `node --check` + check-html）
+- 登录日志/操作审计 → 功能未实现（复审 #12 从 README 删掉了夸大描述），需要时另立项
+- 后台同步多人在线等大数据量优化（复审 #14 提及）→ 当前数据量级（数百学员）用不到，不排队

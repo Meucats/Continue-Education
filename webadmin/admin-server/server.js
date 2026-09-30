@@ -15,7 +15,9 @@ if (fs.existsSync(configPath)) {
 }
 
 const app = express();
-app.use(cors());
+// CORS：默认不下发跨域头（页面与接口同源，跨域请求由浏览器拦截）；如需放开，在 config.json 配 corsOrigins
+const corsOrigins = Array.isArray(config.corsOrigins) ? config.corsOrigins : [];
+app.use(cors(corsOrigins.length ? { origin: corsOrigins } : { origin: false }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -53,7 +55,9 @@ function verifyToken(token) {
   if (!token || typeof token !== 'string' || !token.includes('.')) return null;
   const [body, sig] = token.split('.');
   const expected = crypto.createHmac('sha256', TOKEN_SECRET).update(body).digest('base64url');
-  if (sig !== expected) return null;
+  const sigBuf = Buffer.from(String(sig || ''));
+  const expBuf = Buffer.from(expected);
+  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) return null;
   try {
     const data = JSON.parse(Buffer.from(body, 'base64url').toString());
     if (!data.exp || data.exp < Date.now()) return null;
@@ -79,6 +83,25 @@ function requireSuperadmin(req, res, next) {
   next();
 }
 
+// 超管，或「操作对象==当前登录人」的普通管理员（个人主页自助修改用）。
+// 无论谁调用都会先取目标管理员：既判 self，也给「改他人角色/班级/密码吊销 token」用。
+async function requireSuperadminOrSelf(req, res, next) {
+  try {
+    const list = await callCloudFunction('getAdmins');
+    const target = ((list && list.data) || []).find(a => a._id === req.params.id);
+    if (!target) return res.status(404).json({ success: false, message: '管理员不存在' });
+    req.targetAdmin = target;
+    const isSelf = (!!req.admin._id && target._id === req.admin._id) || target.phone === req.admin.phone;
+    req.selfUpdate = isSelf;
+    if (!isSelf && (!req.admin || req.admin.role !== 'superadmin')) {
+      return res.status(403).json({ success: false, message: '只能修改自己的账号信息' });
+    }
+    next();
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+}
+
 // 除登录外，所有 /api 请求均需鉴权
 app.use('/api', (req, res, next) => {
   const urlPath = (req.originalUrl || req.url || '').split('?')[0];
@@ -90,7 +113,9 @@ app.use('/api', (req, res, next) => {
 const upload = multer({ dest: 'uploads/' });
 if (!fs.existsSync(path.join(__dirname, 'uploads'))) fs.mkdirSync(path.join(__dirname, 'uploads'));
 
-// ====== 登录限速（服务端） ======
+// ====== 登录限速（服务端，best-effort 边缘防抖） ======
+// 权威限速在云函数 adminApi（rate_limits 集合持久化，多实例共享、重启不清零，复审 #9）；
+// 本层仅进程内存，Express 重启即清零 —— 只用于挡住明显刷接口，不承担最终安全职责。
 const loginAttempts = new Map();
 function loginRateLimited(key) {
   const now = Date.now();
@@ -115,48 +140,80 @@ function clearLoginFails(key) { loginAttempts.delete(key); }
 // ====== 云函数调用封装 ======
 let accessToken = '';
 let tokenExpiry = 0;
+let tokenFetch = null;
 
 async function getAccessToken() {
   if (accessToken && Date.now() < tokenExpiry) return accessToken;
   if (!config.appId || !config.appSecret) {
     throw new Error('请在 config.json 中配置 appId 和 appSecret');
   }
-  const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${config.appId}&secret=${config.appSecret}`;
-  const result = await httpGet(url);
-  if (result.access_token) {
-    accessToken = result.access_token;
-    tokenExpiry = Date.now() + (result.expires_in - 60) * 1000;
-    return accessToken;
-  }
-  throw new Error('获取 access_token 失败: ' + JSON.stringify(result));
+  // 单飞行锁：并发调用共用同一次换 token 请求，避免互相挤掉（40001）
+  if (tokenFetch) return tokenFetch;
+  tokenFetch = (async () => {
+    try {
+      const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${config.appId}&secret=${config.appSecret}`;
+      const result = await httpGet(url);
+      if (result.access_token) {
+        accessToken = result.access_token;
+        tokenExpiry = Date.now() + (result.expires_in - 60) * 1000;
+        return accessToken;
+      }
+      throw new Error('获取 access_token 失败: ' + JSON.stringify(result));
+    } finally {
+      tokenFetch = null;
+    }
+  })();
+  return tokenFetch;
 }
 
 async function callCloudFunction(action, params = {}) {
   if (!config.adminApiSecret) {
     throw new Error('未配置 adminApiSecret：请在 config.json 中设置与云函数环境变量 ADMIN_API_SECRET 一致的值');
   }
-  const token = await getAccessToken();
-  const url = `https://api.weixin.qq.com/tcb/invokecloudfunction?access_token=${token}&env=${config.env}&name=adminApi`;
   const body = JSON.stringify({ action, secret: config.adminApiSecret, ...params });
-  const result = await httpPost(url, body);
-  // 云函数返回格式可能是 resp_data 或 response
-  const respData = result.resp_data || result.response;
-  if (respData) {
-    return typeof respData === 'string' ? JSON.parse(respData) : respData;
+  let lastErr = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let result;
+    try {
+      const token = await getAccessToken();
+      const url = `https://api.weixin.qq.com/tcb/invokecloudfunction?access_token=${token}&env=${config.env}&name=adminApi`;
+      result = await httpPost(url, body);
+    } catch (err) {
+      // 网络级错误（超时/断连/换 token 失败）→ 重试一次
+      lastErr = err;
+      if (attempt === 0) continue;
+      throw err;
+    }
+    // access_token 失效（被其他调用方挤掉）或瞬时错误 → 刷缓存重试一次
+    const retriable = result && [40001, 42001, 40014, -601008].includes(result.errcode);
+    if (retriable && attempt === 0) {
+      accessToken = '';
+      tokenExpiry = 0;
+      lastErr = result;
+      continue;
+    }
+    // 云函数返回格式可能是 resp_data 或 response
+    const respData = result.resp_data || result.response;
+    if (respData) {
+      return typeof respData === 'string' ? JSON.parse(respData) : respData;
+    }
+    if (result.errcode === 0) {
+      return { success: true };
+    }
+    throw new Error('云函数调用失败: ' + JSON.stringify(result));
   }
-  if (result.errcode === 0) {
-    return { success: true };
-  }
-  throw new Error('云函数调用失败: ' + JSON.stringify(result));
+  throw new Error('云函数调用失败: ' + JSON.stringify(lastErr));
 }
 
 function httpGet(url) {
   return new Promise((resolve, reject) => {
-    https.get(url, res => {
+    const req = https.get(url, res => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
-    }).on('error', reject);
+    });
+    req.setTimeout(10000, () => req.destroy(new Error('请求超时（10秒）')));
+    req.on('error', reject);
   });
 }
 
@@ -173,6 +230,7 @@ function httpPost(url, body) {
       res.on('data', chunk => data += chunk);
       res.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
     });
+    req.setTimeout(10000, () => req.destroy(new Error('请求超时（10秒）')));
     req.on('error', reject);
     req.write(body);
     req.end();
@@ -196,6 +254,7 @@ app.post('/api/admin/login', async (req, res) => {
     clearLoginFails(limiterKey);
     const admin = result.data;
     const token = signToken({
+      _id: admin._id,
       phone: admin.phone,
       name: admin.name,
       role: admin.role || 'admin',
@@ -204,7 +263,7 @@ app.post('/api/admin/login', async (req, res) => {
     });
     return res.json({
       success: true,
-      data: { name: admin.name, phone: admin.phone, role: admin.role, classes: admin.classes || [], mustChangePassword: !!admin.mustChangePassword, token }
+      data: { _id: admin._id, name: admin.name, phone: admin.phone, role: admin.role, classes: admin.classes || [], mustChangePassword: !!admin.mustChangePassword, token }
     });
   } catch (err) {
     res.json({ success: false, message: err.message });
@@ -213,8 +272,8 @@ app.post('/api/admin/login', async (req, res) => {
 
 // ====== 当前登录管理员（会话校验） ======
 app.get('/api/admin/me', (req, res) => {
-  const { phone, name, role, classes, mustChangePassword } = req.admin;
-  res.json({ success: true, data: { name, phone, role, classes: classes || [], mustChangePassword: !!mustChangePassword } });
+  const { _id, phone, name, role, classes, mustChangePassword } = req.admin;
+  res.json({ success: true, data: { _id, name, phone, role, classes: classes || [], mustChangePassword: !!mustChangePassword } });
 });
 
 // ====== 退出登录：立即作废该账号本机签发的所有 token ======
@@ -235,6 +294,7 @@ app.post('/api/admin/change-password', async (req, res) => {
     if (!result || !result.success) return res.json(result || { success: false, message: '修改失败' });
     setTokenNotBefore(req.admin.phone);
     const token = signToken({
+      _id: req.admin._id,
       phone: req.admin.phone,
       name: req.admin.name,
       role: req.admin.role || 'admin',
@@ -266,13 +326,44 @@ app.post('/api/admins', requireSuperadmin, async (req, res) => {
   }
 });
 
-app.put('/api/admins/:id', requireSuperadmin, async (req, res) => {
+app.put('/api/admins/:id', requireSuperadminOrSelf, async (req, res) => {
   try {
-    const result = await callCloudFunction('updateAdmin', { data: { _id: req.params.id, ...req.body } });
-    if (result && result.success) {
-      // 改了自己或改了密码：本地旧 token 一并失效
-      const targetPhone = (req.body && req.body.phone) || req.admin.phone;
-      if (targetPhone === req.admin.phone && (req.body.password || req.body.phone)) setTokenNotBefore(req.admin.phone);
+    const body = { ...(req.body || {}) };
+    if (req.selfUpdate) {
+      // 自助修改只允许姓名/账号：密码走 change-password，权限字段仅超管可动
+      delete body.role;
+      delete body.classes;
+      delete body.password;
+      delete body.mustChangePassword;
+    }
+    const target = req.targetAdmin || null;
+    const result = await callCloudFunction('updateAdmin', { data: { _id: req.params.id, ...body } });
+    if (result && result.success && req.selfUpdate && target) {
+      const phoneChanged = !!(body.phone && body.phone !== target.phone);
+      if (phoneChanged) {
+        // 改账号：旧手机号全部 token 立即失效（含当前）→ 前端提示用新账号重新登录
+        setTokenNotBefore(target.phone);
+        return res.json({ ...result, data: { relogin: true } });
+      }
+      if (body.name && body.name !== target.name) {
+        // 改姓名：签发带新姓名的 token，当前页不掉线
+        const token = signToken({
+          _id: req.admin._id,
+          phone: req.admin.phone,
+          name: body.name,
+          role: req.admin.role || 'admin',
+          classes: req.admin.classes || [],
+          mustChangePassword: !!req.admin.mustChangePassword
+        });
+        return res.json({ ...result, data: { token } });
+      }
+    }
+    if (result && result.success && !req.selfUpdate && target) {
+      // 超管改他人：角色/班级变更、改密码、改账号 → 对方旧 token 全部失效，重新登录获取新权限
+      const roleChanged = !!(body.role && body.role !== target.role);
+      const classesChanged = JSON.stringify(body.classes || []) !== JSON.stringify(target.classes || []);
+      const phoneChanged = !!(body.phone && body.phone !== target.phone);
+      if (roleChanged || classesChanged || body.password || phoneChanged) setTokenNotBefore(target.phone);
     }
     res.json(result);
   } catch (err) {
@@ -321,7 +412,7 @@ app.post('/api/admins/init', requireSuperadmin, async (req, res) => {
 // ====== 学员管理 ======
 app.get('/api/students', async (req, res) => {
   try {
-    const result = await callCloudFunction('getStudents', { keyword: req.query.keyword });
+    const result = await callCloudFunction('getStudents', { keyword: req.query.keyword, actorRole: req.admin.role, actorClasses: req.admin.classes || [] });
     res.json(result);
   } catch (err) {
     res.json({ success: false, message: err.message });
@@ -524,7 +615,7 @@ function generateCourseDatesFromSchedule(schedule, startDate, endDate) {
 // ====== 入校申请 ======
 app.get('/api/requests', async (req, res) => {
   try {
-    const result = await callCloudFunction('getRequests', { status: req.query.status });
+    const result = await callCloudFunction('getRequests', { status: req.query.status, actorRole: req.admin.role, actorClasses: req.admin.classes || [] });
     res.json(result);
   } catch (err) {
     res.json({ success: false, message: err.message });
@@ -589,7 +680,7 @@ app.post('/api/accounts/sync', async (req, res) => {
 // ====== 统计 ======
 app.get('/api/stats', async (req, res) => {
   try {
-    const result = await callCloudFunction('getStats');
+    const result = await callCloudFunction('getStats', { actorRole: req.admin.role, actorClasses: req.admin.classes || [] });
     res.json(result);
   } catch (err) {
     res.json({ success: false, message: err.message });
@@ -598,7 +689,7 @@ app.get('/api/stats', async (req, res) => {
 
 app.get('/api/stats/detail', async (req, res) => {
   try {
-    const result = await callCloudFunction('getStats');
+    const result = await callCloudFunction('getStats', { actorRole: req.admin.role, actorClasses: req.admin.classes || [] });
     res.json(result);
   } catch (err) {
     res.json({ success: false, message: err.message });
@@ -608,7 +699,7 @@ app.get('/api/stats/detail', async (req, res) => {
 // ====== 导出/下载 ======
 app.get('/api/export/students', async (req, res) => {
   try {
-    const result = await callCloudFunction('getStudents');
+    const result = await callCloudFunction('getStudents', { actorRole: req.admin.role, actorClasses: req.admin.classes || [] });
     if (!result.success) return res.status(500).send('导出失败');
     const data = [['姓名', '联系电话', '身份证', '公司', '班级名称', '上课时间段', '课程开始日期', '课程结束日期', '上课截止时间', '上课地点']];
     result.data.forEach(s => data.push([s.name, s.phone, s.idCard || '', s.company || '', s.className, s.schedule, s.courseStartDate || '', s.courseEndDate || '', s.deadline, s.location]));
@@ -690,7 +781,7 @@ app.delete('/api/tips/:id', async (req, res) => {
 // ====== 班级列表 ======
 app.get('/api/classes', async (req, res) => {
   try {
-    const result = await callCloudFunction('getClasses');
+    const result = await callCloudFunction('getClasses', { actorRole: req.admin.role, actorClasses: req.admin.classes || [] });
     res.json(result);
   } catch (err) {
     res.json({ success: false, message: err.message });
@@ -746,15 +837,25 @@ app.listen(PORT, async () => {
     console.log('  ❌ 未配置 adminApiSecret：登录等接口将全部失败');
     console.log('     请在 config.json 中补充 adminApiSecret（与云函数 ADMIN_API_SECRET 一致）');
   }
-  console.log('  提示: 默认账号 admin/admin123 首次登录会强制修改密码');
+  console.log('  提示: 普通管理员/被重置账号首登强制改密；超管不强制改密');
+  console.log('        部署后请立即手动修改默认口令 admin/admin123（默认账号首次登录也会强制改密一次）');
   console.log('');
   console.log('==========================================');
 
-  // 初始化默认管理员
-  try {
-    await callCloudFunction('initDefaultAdmin');
-    console.log('  ✅ 默认管理员初始化完成');
-  } catch (e) {
-    console.log('  ⚠️ 默认管理员初始化失败（首次需配置 appId/appSecret）:', e.message);
+  // 云端预热：拿 access_token + 触发云函数冷启动，失败退避重试，避免用户首屏踩冷启动
+  let warmOk = false;
+  for (let i = 0; i < 3 && !warmOk; i++) {
+    try {
+      await callCloudFunction('initDefaultAdmin');
+      warmOk = true;
+      console.log('  ✅ 默认管理员初始化 + 云端预热完成');
+    } catch (e) {
+      if (i < 2) {
+        console.log(`  ⏳ 云端预热失败，${600 * (i + 1)}ms 后重试（${i + 1}/2）...`);
+        await new Promise(r => setTimeout(r, 600 * (i + 1)));
+      } else {
+        console.log('  ❌ 云端预热失败（首页数据可能无法加载）:', e.message);
+      }
+    }
   }
 });
