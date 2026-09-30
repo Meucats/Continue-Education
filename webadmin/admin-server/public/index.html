@@ -1892,7 +1892,7 @@
                             <div class="template-desc">包含标准表头和示例数据，下载后填写学员信息即可导入</div>
                         </div>
                     </div>
-                    <a href="/api/template/download" class="btn btn-primary">
+                    <a href="javascript:void(0)" onclick="downloadWithAuth('/api/template/download','学员导入模板.xlsx')" class="btn btn-primary">
                         <svg class="ico ico-sm"><use href="#i-download"/></svg>下载模板
                     </a>
                 </div>
@@ -1959,10 +1959,6 @@
 
             <!-- ========== 管理员管理 ========== -->
             <div id="page-admin-manage" class="page-content hidden">
-                <div class="info-banner">
-                    <span class="banner-icon"><svg class="ico"><use href="#i-info"/></svg></span>
-                    <div>管理后台管理员账号。默认管理员（admin）不可删除。</div>
-                </div>
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">管理员列表</div>
@@ -1980,7 +1976,7 @@
                                     <th>角色</th>
                                     <th class="cell-wrap">负责班级</th>
                                     <th>创建时间</th>
-                                    <th width="160">操作</th>
+                                    <th width="200">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="adminTableBody"></tbody>
@@ -1991,10 +1987,6 @@
 
             <!-- ========== 温馨提示 ========== -->
             <div id="page-tips" class="page-content hidden">
-                <div class="info-banner">
-                    <span class="banner-icon"><svg class="ico"><use href="#i-info"/></svg></span>
-                    <div>为每个班级设置温馨提示，学员登录小程序后将在首页看到对应提示。</div>
-                </div>
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">温馨提示列表</div>
@@ -2018,12 +2010,6 @@
 
             <!-- ========== 学员账户 ========== -->
             <div id="page-accounts" class="page-content hidden">
-                <div class="info-banner">
-                    <span class="banner-icon"><svg class="ico"><use href="#i-info"/></svg></span>
-                    <div>
-                        学员初始密码为身份证后6位（无身份证时为手机后6位），密码仅以哈希形式存储，可在学员管理中重置。
-                    </div>
-                </div>
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">账户列表</div>
@@ -2196,8 +2182,8 @@
                 <input type="text" id="adminPhone" class="form-input" placeholder="用于登录的账号">
             </div>
             <div class="form-group">
-                <label class="form-label">密码 <span id="pwdRequired" class="required">*</span></label>
-                <input type="password" id="adminPwd" class="form-input" placeholder="请输入密码">
+                <label class="form-label">密码 <span id="pwdRequired" class="required" style="display:none;">*</span></label>
+                <input type="password" id="adminPwd" class="form-input" placeholder="留空则默认为手机号">
                 <small id="pwdHint" class="form-hint" style="display:none;">留空则不修改密码</small>
             </div>
             <div class="form-group">
@@ -2260,9 +2246,9 @@
             <div class="info-banner" style="margin-bottom:16px;">
                 <span class="banner-icon"><svg class="ico"><use href="#i-info"/></svg></span>
                 <div>
-                    Excel 表头：<strong>姓名、账号、密码、角色、班级</strong><br>
-                    角色可选：admin（管理员）或 superadmin（超级管理员）<br>
-                    班级用逗号分隔，如：计算机基础班,会计实务班
+                    Excel 表头：<strong>姓名、电话、负责班级</strong>（可选列：密码、角色）<br>
+                    不填密码时：<strong>账号和密码都为该手机号</strong>；创建时间导入时自动生成<br>
+                    导入的管理员<strong>首次登录需修改密码</strong>；负责班级多个用英文逗号分隔，如：计算机基础班,会计实务班
                 </div>
             </div>
             <div class="upload-zone" id="adminUploadZone" style="padding:24px;">
@@ -2273,6 +2259,7 @@
             <div id="adminImportResult" style="margin-top:12px;"></div>
         </div>
         <div class="modal-footer">
+            <button class="btn btn-primary" onclick="downloadWithAuth('/api/template/admins','管理员导入模板.xlsx')">下载导入模板</button>
             <button class="btn btn-secondary" onclick="closeAdminImportModal()">关闭</button>
         </div>
     </div>
@@ -2291,11 +2278,6 @@ function escapeHtml(v) {
     return String(v)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-function maskIdCard(v) {
-    const s = String(v || '');
-    if (s.length < 9) return s || '-';
-    return s.slice(0, 3) + '***********' + s.slice(-4);
 }
 // 行数据注册表：避免把用户数据拼进 onclick 字符串
 const rowStore = { tips: {}, admins: {} };
@@ -2487,12 +2469,15 @@ function enterAdmin(data) {
     document.getElementById('adminAvatar').textContent = (data.name || '管').charAt(0);
     document.getElementById('adminNameDisplay').textContent = data.name || '管理员';
     applyRolePermission();
+    // 清掉上一个账号残留的数据与页面，回到首页
+    allStudents = [];
+    pendingCount = 0;
+    switchPage('dashboard', document.querySelectorAll('.nav-item')[0]);
     if (data.mustChangePassword) {
         showForcePasswordChange();
         return;
     }
     document.getElementById('forcePwdModal').classList.remove('show');
-    loadDashboard();
     requestAnimationFrame(() => Motion.adminEntrance());
 }
 
@@ -2580,6 +2565,8 @@ function applyRolePermission() {
 }
 
 function doLogout() {
+    // 服务端立即作废该账号 token，再清本地并整页刷新，避免残留上一个账号的页面/数据
+    apiFetch(`${API_BASE}/admin/logout`, { method: 'POST' }).catch(() => {});
     clearSession();
     closeSidebar();
     document.getElementById('forcePwdModal').classList.remove('show');
@@ -2588,7 +2575,7 @@ function doLogout() {
     document.getElementById('loginPassword').value = '';
     currentAdminRole = '';
     applyRemembered();
-    requestAnimationFrame(() => Motion.loginEntrance());
+    setTimeout(() => location.reload(), 200);
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -2718,7 +2705,7 @@ function renderStudents(students) {
             <td><input type="checkbox" class="stu-check" value="${escapeHtml(s._id)}" aria-label="选择 ${escapeHtml(s.name)}"></td>
             <td><strong>${escapeHtml(s.name)}</strong></td>
             <td class="num">${escapeHtml(s.phone)}</td>
-            <td class="num">${maskIdCard(s.idCard)}</td>
+            <td class="num">${escapeHtml(s.idCard) || '-'}</td>
             <td class="cell-wrap">${escapeHtml(s.company) || '-'}</td>
             <td class="cell-wrap">${escapeHtml(s.className)}</td>
             <td class="cell-wrap">${escapeHtml(s.schedule)}</td>
@@ -3091,6 +3078,7 @@ function renderAdmins(admins) {
             <td class="num">${escapeHtml(created)}</td>
             <td>
                 ${isSuperAdmin ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="editAdmin('${escapeHtml(rowId)}')" title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>` : ''}
+                ${isSuperAdmin && !isSelf ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="resetAdminPassword('${escapeHtml(rowId)}')" title="重置密码" aria-label="重置密码">${ico('i-key','ico-sm')}</button>` : ''}
                 ${isSuperAdmin && !isDefault && !isSelf ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="deleteAdmin('${escapeHtml(rowId)}')" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>` : ''}
             </td>
         </tr>`;
@@ -3101,8 +3089,9 @@ function showAddAdminModal() {
     document.getElementById('adminModalTitle').textContent = '添加管理员';
     ['editAdminId','adminName','adminPhone','adminPwd'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('adminRole').value = 'admin';
-    document.getElementById('pwdRequired').style.display = '';
-    document.getElementById('pwdHint').style.display = 'none';
+    document.getElementById('pwdRequired').style.display = 'none';
+    document.getElementById('pwdHint').textContent = '留空则账号、密码都为手机号；该账号首次登录需修改密码';
+    document.getElementById('pwdHint').style.display = '';
     loadClassesForAdmin([]);
     document.getElementById('adminModal').classList.add('show');
 }
@@ -3117,6 +3106,7 @@ function editAdmin(id) {
     document.getElementById('adminPwd').value = '';
     document.getElementById('adminRole').value = a.role || 'admin';
     document.getElementById('pwdRequired').style.display = 'none';
+    document.getElementById('pwdHint').textContent = '留空则不修改密码';
     document.getElementById('pwdHint').style.display = '';
     loadClassesForAdmin(a.classes || []);
     document.getElementById('adminModal').classList.add('show');
@@ -3153,7 +3143,6 @@ function saveAdmin() {
     const role = document.getElementById('adminRole').value;
     const classes = getSelectedClasses();
     if (!name || !phone) return showToast('请填写姓名和账号', 'error');
-    if (!editId && !password) return showToast('请填写密码', 'error');
 
     const data = { name, phone, role, classes };
     if (password) data.password = password;
@@ -3165,7 +3154,6 @@ function saveAdmin() {
             if (res.success) { showToast(res.message); closeAdminModal(); loadAdmins(); } else showToast(res.message, 'error');
         });
     } else {
-        data.password = password;
         apiFetch(`${API_BASE}/admins`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
         }).then(r => r.json()).then(res => {
@@ -3185,15 +3173,30 @@ function deleteAdmin(id) {
     });
 }
 
+function resetAdminPassword(id) {
+    const a = rowStore.admins[id];
+    const name = a ? a.name : '';
+    if (!confirm(`确定要重置管理员"${name}"的密码吗？\n新密码为该账号本身，对方下次登录时必须修改密码。`)) return;
+    apiFetch(`${API_BASE}/admins/${encodeURIComponent(id)}/reset-password`, {
+        method: 'POST'
+    }).then(r => r.json()).then(res => {
+        if (res.success) {
+            const newPwd = (res.data && res.data.newPassword) || res.newPassword || '';
+            showToast(`已重置，新密码：${newPwd}（对方下次登录需修改）`, 'success', 6000);
+            loadAdmins();
+        } else showToast(res.message || '重置失败', 'error');
+    }).catch(e => showToast('重置失败：' + e.message, 'error'));
+}
+
 // ============ 工具函数 ============
-function showToast(msg, type = 'success') {
+function showToast(msg, type = 'success', duration = 3000) {
     const icons = { success: 'i-check-circle', error: 'i-x-circle', info: 'i-info' };
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     toast.innerHTML = ico(icons[type] || 'i-info') + ` <span>${escapeHtml(msg)}</span>`;
     document.body.appendChild(toast);
     Motion.toastIn(toast);
-    setTimeout(() => { toast.classList.add('out'); setTimeout(() => toast.remove(), 300); }, 3000);
+    setTimeout(() => { toast.classList.add('out'); setTimeout(() => toast.remove(), 300); }, duration);
 }
 
 document.getElementById('loginPassword').addEventListener('keyup', e => { if (e.key === 'Enter') doLogin(); });
@@ -3371,6 +3374,7 @@ function handleAdminFileSelect(e) {
             if (d.errors && d.errors.length > 0) {
                 html += '<div class="error-list">' + d.errors.map(e => `<div class="error-item">${ico('i-alert','ico-sm')} ${escapeHtml(e)}</div>`).join('') + '</div>';
             }
+            html += '<div class="result-box result-info" style="margin-top:8px;"><div>未填密码的账号：账号和密码都为手机号；创建时间已自动生成；对方首次登录时会要求修改密码。</div></div>';
             document.getElementById('adminImportResult').innerHTML = html;
             loadAdmins();
         } else {

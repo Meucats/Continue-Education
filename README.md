@@ -1,7 +1,6 @@
 # 杭职大继教院进校系统
 
-- **线上管理后台（国内推荐）**：`webadmin/admin-server` → 腾讯云服务器，见 [`腾讯云部署教程.md`](./腾讯云部署教程.md)
-- **线上管理后台（备用）**：`webadmin/cloudflare` → Cloudflare Workers（国内可能打不开）
+- **线上管理后台**：`webadmin/admin-server` → 腾讯云服务器，见 [`腾讯云部署教程.md`](./腾讯云部署教程.md)
 - **本机管理后台**：`webadmin/admin-server` → Express（localhost:3000）
 - **小程序**：`wxminiprogram` → 微信开发者工具
 

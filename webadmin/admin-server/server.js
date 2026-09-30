@@ -217,6 +217,12 @@ app.get('/api/admin/me', (req, res) => {
   res.json({ success: true, data: { name, phone, role, classes: classes || [], mustChangePassword: !!mustChangePassword } });
 });
 
+// ====== 退出登录：立即作废该账号本机签发的所有 token ======
+app.post('/api/admin/logout', (req, res) => {
+  setTokenNotBefore(req.admin.phone);
+  res.json({ success: true, message: '已退出登录' });
+});
+
 // ====== 修改当前管理员密码（代理云函数，改密后旧 token 全部失效） ======
 app.post('/api/admin/change-password', async (req, res) => {
   const { oldPassword, newPassword } = req.body;
@@ -282,6 +288,21 @@ app.delete('/api/admins/:id', requireSuperadmin, async (req, res) => {
       return res.json({ success: false, message: '不能删除自己的账号' });
     }
     const result = await callCloudFunction('deleteAdmin', { id: req.params.id });
+    res.json(result);
+  } catch (err) {
+    res.json({ success: false, message: err.message });
+  }
+});
+
+// ====== 重置管理员密码（账号=密码=手机号，重置后对方首登强制改密） ======
+app.post('/api/admins/:id/reset-password', requireSuperadmin, async (req, res) => {
+  try {
+    const list = await callCloudFunction('getAdmins');
+    const target = (list && list.data || []).find(a => a._id === req.params.id);
+    if (target && target.phone === req.admin.phone) {
+      return res.json({ success: false, message: '不能重置自己的账号，请使用修改密码功能' });
+    }
+    const result = await callCloudFunction('resetAdminPassword', { id: req.params.id });
     res.json(result);
   } catch (err) {
     res.json({ success: false, message: err.message });
@@ -622,6 +643,23 @@ app.get('/api/template/download', (req, res) => {
 });
 
 // ====== 温馨提示 ======
+// 管理员导入模板（姓名 / 电话 / 负责班级）
+app.get('/api/template/admins', (req, res) => {
+  const data = [
+    ['姓名', '电话', '负责班级'],
+    ['张三', '13800138001', '计算机基础班,会计实务班'],
+    ['李四', '13800138002', '英语提高班']
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [{ wch: 12 }, { wch: 16 }, { wch: 40 }];
+  XLSX.utils.book_append_sheet(wb, ws, '管理员');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Disposition', 'attachment; filename=admins.xlsx');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.send(buf);
+});
+
 app.get('/api/tips', async (req, res) => {
   try {
     const result = await callCloudFunction('getAllTips');

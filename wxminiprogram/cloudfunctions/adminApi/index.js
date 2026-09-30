@@ -18,7 +18,7 @@ const PRELOGIN_ACTIONS = new Set(['changeAdminPassword']);
 // 学员会话可访问的 action
 const STUDENT_ACTIONS = new Set(['getStudentSelf', 'getMyRequests', 'upsertMyUser']);
 // 仅超管（或服务端）可访问
-const SUPERADMIN_ACTIONS = new Set(['addAdmin', 'updateAdmin', 'deleteAdmin', 'importAdmins', 'initDefaultAdmin']);
+const SUPERADMIN_ACTIONS = new Set(['addAdmin', 'updateAdmin', 'deleteAdmin', 'resetAdminPassword', 'importAdmins', 'initDefaultAdmin']);
 
 // 登录限速（按实例内存，尽力而为）
 const attempts = new Map();
@@ -293,7 +293,8 @@ exports.main = async (event, context) => {
       if (needsRehash(admin.password)) {
         await db.collection('admins').doc(admin._id).update({ data: { password: hashPassword(aPwd) } });
       }
-      const mustChange = !!admin.mustChangePassword;
+      // 超管不强制改密（普通管理员由超管直接设置初始密码，重置密码后仍需首登改密）
+      const mustChange = !!admin.mustChangePassword && (admin.role || 'admin') !== 'superadmin';
       const t = await createSession({ type: 'admin', phone: admin.phone, name: admin.name, role: admin.role || 'admin', mustChangePassword: mustChange });
       return {
         success: true,
@@ -606,11 +607,12 @@ exports.main = async (event, context) => {
 
     case 'addAdmin': {
       const { name: aName, phone: aPhone2, password: aPwd2, role, classes: aClasses } = data || {};
-      if (!aName || !aPhone2 || !aPwd2) return { success: false, message: '请填写所有字段' };
+      if (!aName || !aPhone2) return { success: false, message: '请填写姓名和账号' };
       const exists = await db.collection('admins').where({ phone: aPhone2 }).get();
       if (exists.data.length > 0) return { success: false, message: '该账号已存在' };
+      // 未填密码时：账号=手机号，密码=手机号；由超管创建 → 首次登录强制改密
       await db.collection('admins').add({
-        data: { name: aName, phone: aPhone2, password: hashPassword(aPwd2), role: role || 'admin', classes: aClasses || [], createdAt: new Date() }
+        data: { name: aName, phone: aPhone2, password: hashPassword(String(aPwd2 || '').trim() || aPhone2), role: role || 'admin', classes: aClasses || [], mustChangePassword: true, createdAt: new Date() }
       });
       return { success: true, message: '添加成功' };
     }
@@ -621,7 +623,8 @@ exports.main = async (event, context) => {
       const updateData = { name: uName, phone: uPhone, role: uRole || 'admin', classes: uClasses || [] };
       if (uPwd) {
         updateData.password = hashPassword(uPwd);
-        updateData.mustChangePassword = false;
+        // 超管下发的是临时密码 → 对方下次登录需改密（超管登录时会被豁免）
+        updateData.mustChangePassword = true;
       }
       await db.collection('admins').doc(_id).update({ data: updateData });
       if (uPwd || uPhone) await revokeSessions(uPhone, 'admin');
@@ -637,6 +640,30 @@ exports.main = async (event, context) => {
       if (adminDoc.data) await revokeSessions(adminDoc.data.phone, 'admin');
       await db.collection('admins').doc(id).remove();
       return { success: true, message: '删除成功' };
+    }
+
+    case 'resetAdminPassword': {
+      const tId = (data && data.id) || id;
+      const tPhone = data && data.phone;
+      let target = null;
+      if (tId) {
+        try {
+          const doc = await db.collection('admins').doc(tId).get();
+          target = doc.data || null;
+        } catch (e) { target = null; }
+      }
+      if (!target && tPhone) {
+        const r = await db.collection('admins').where({ phone: tPhone }).limit(1).get();
+        target = r.data[0] || null;
+      }
+      if (!target) return { success: false, message: '管理员不存在' };
+      // 规则：账号=密码=手机号（默认管理员重置为 admin123）；重置后对方首登强制改密
+      const newPwd = target.phone === 'admin' ? 'admin123' : target.phone;
+      await db.collection('admins').doc(target._id).update({
+        data: { password: hashPassword(newPwd), mustChangePassword: true, updatedAt: new Date() }
+      });
+      await revokeSessions(target.phone, 'admin');
+      return { success: true, message: '密码已重置', newPassword: newPwd };
     }
 
     case 'initDefaultAdmin': {
@@ -701,13 +728,24 @@ exports.main = async (event, context) => {
       let addedA = 0, failedA = 0;
       const errorsA = [];
       for (let i = 0; i < adminList.length; i++) {
-        const a = adminList[i];
+        const a = adminList[i] || {};
         try {
-          if (!a.name || !a.phone || !a.password) { errorsA.push(`第${i + 2}行：缺少必填字段`); failedA++; continue; }
-          const dup = await db.collection('admins').where({ phone: a.phone }).get();
+          const name = String(a.name || '').trim();
+          const phone = String(a.phone || '').trim();
+          const inputPwd = String(a.password || '').trim();
+          if (!name || !phone) { errorsA.push(`第${i + 2}行：缺少姓名或电话`); failedA++; continue; }
+          const dup = await db.collection('admins').where({ phone }).get();
           if (dup.data.length > 0) { errorsA.push(`第${i + 2}行：账号已存在`); failedA++; continue; }
+          // 模板只有姓名/电话/负责班级时：账号=手机号，密码=手机号；创建时间自动生成；首次登录强制改密
           await db.collection('admins').add({
-            data: { name: a.name, phone: a.phone, password: hashPassword(a.password), role: a.role || 'admin', classes: a.classes || [], createdAt: new Date() }
+            data: {
+              name, phone,
+              password: hashPassword(inputPwd || phone),
+              role: a.role === 'superadmin' ? 'superadmin' : 'admin',
+              classes: a.classes || [],
+              mustChangePassword: true,
+              createdAt: new Date()
+            }
           });
           addedA++;
         } catch (err) {

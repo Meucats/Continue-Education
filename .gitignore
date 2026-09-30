@@ -6,6 +6,7 @@ node_modules/
 **/config.json
 !**/config.example.json
 **/.token-secret
+**/.token-state.json
 **/admins.json
 webadmin/admin-server/data/
 webadmin/admin-server/uploads/
@@ -16,7 +17,6 @@ package-lock.json
 webadmin/.env
 .env
 .env.*
-!.env.example
 
 # 小程序依赖构建产物（用微信开发者工具重新生成）
 wxminiprogram/miniprogram_npm/
@@ -28,7 +28,6 @@ Thumbs.db
 *.local
 
 # 缓存
-.wrangler/
 .cache/
 dist/
 temp/

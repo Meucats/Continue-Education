@@ -1,13 +1,12 @@
 # Web 管理后台（webadmin）
 
-进校系统的 Web 管理端，**同一套业务逻辑的两种部署形态**，均不直接读写数据库，全部通过云函数 `adminApi` 完成登录与数据操作：
+进校系统的 Web 管理端（Node + Express），不直接读写数据库，全部通过云函数 `adminApi` 完成登录与数据操作：
 
 | 目录 | 形态 | 说明 |
 |------|------|------|
 | `admin-server/` | Node + Express | 腾讯云服务器 / 本机 / 局域网主用，`pm2` 常驻 |
-| `cloudflare/` | Cloudflare Workers | 备用站点，`wrangler deploy` 发布 |
 
-## 统一鉴权模型（三端一致）
+## 统一鉴权模型（与小程序一致）
 
 1. 服务端调用云函数时携带 `secret`，云函数校验它与环境变量 `ADMIN_API_SECRET` 是否一致；**未配置则全部失败（fail-closed）**。
 2. 浏览器侧不保存任何密码，只保存云函数签发的 **7 天随机 token**（`sessions` 集合），改密后全部撤销。
@@ -16,10 +15,9 @@
 5. 首次登录 `admin/admin123` 会被**强制修改密码**（不可跳过，只能退出登录）。
 6. 超级管理员才能增删管理员、导入管理员账号；普通管理员只能看被分配的班级。
 
-三处 `ADMIN_API_SECRET` 必须完全一致：
+两处 `ADMIN_API_SECRET` 必须完全一致：
 
 - 云函数 `adminApi` → 环境变量 `ADMIN_API_SECRET`
-- Cloudflare → `npx wrangler secret put ADMIN_API_SECRET`
 - admin-server → `config.json` 的 `adminApiSecret`
 
 ## admin-server（腾讯云 / 本机）
@@ -39,29 +37,17 @@ node server.js                          # 或 start.ps1 / 启动管理后台.bat
 
 完整步骤见根目录 [`部署指南.md`](../部署指南.md) 与 [`腾讯云部署教程.md`](../腾讯云部署教程.md)。
 
-## Cloudflare Workers（备用）
-
-```powershell
-powershell -ExecutionPolicy Bypass -File "webadmin\cloudflare\deploy.ps1"
-```
-
-脚本依次：`npm install` → `wrangler login` → 创建 KV → `secret put WX_APP_SECRET` → `secret put ADMIN_API_SECRET` → `wrangler deploy`。手动命令见 [`DEPLOY.md`](./cloudflare/DEPLOY.md)。
-
-- 同源策略：只允许自身域名的跨域请求
-- 登录失败限速按 `CF-Connecting-IP` 计
-- 免费额度每天 10 万次请求，校园管理场景足够
-
 ## 功能清单
 
-仪表盘统计、学员管理（增删改查/重置密码/批量删除/Excel 导入导出）、入校申请审批、账户管理（学员账号同步）、班级管理、管理员账号（超管）、登录日志、温馨提示（按班级）。
+仪表盘统计、学员管理（增删改查/重置密码/批量删除/Excel 导入导出）、入校申请审批、账户管理（学员账号同步）、班级管理、管理员账号（超管，含重置密码）、登录日志、温馨提示（按班级）。
 
-导出与模板下载走带 `Authorization` 的 blob 下载；表格中的姓名、身份证等用户输入在渲染时统一转义，身份证列表默认脱敏。
+导出与模板下载走带 `Authorization` 的 blob 下载；表格中的姓名、身份证等用户输入在渲染时统一转义（XSS 防护）；身份证完整号码仅超管后台可见，小程序学生端显示时脱敏。
 
 ## 常见问题
 
 | 现象 | 处理 |
 |------|------|
-| 登录提示「云函数调用失败」 | 三端 `ADMIN_API_SECRET` 是否一致；云函数是否已上传 |
-| 部署后打开是旧页面 | Workers 重新 `wrangler deploy`；服务器 `pm2 restart admin-api` |
+| 登录提示「云函数调用失败」 | `ADMIN_API_SECRET` 是否一致；云函数是否已上传 |
+| 部署后打开是旧页面 | 服务器 `pm2 restart admin-api` |
 | 端口 3000 被占用 | 改 `server.js` 末尾 `PORT`，安全组同步放行 |
-| 忘记管理员密码 | 超管在「账户管理」重置；库中无超管时用初始账号 `admin/admin123`（仅当 `admins` 集合为空时可用，登录后强制改密） |
+| 忘记管理员密码 | 超管在「管理员管理」点重置（新密码=账号本身，对方首登需改）；库中无超管时用初始账号 `admin/admin123`（仅当 `admins` 集合为空时可用，登录后强制改密） |
