@@ -101,6 +101,14 @@ function stripSecrets(doc) {
   return rest;
 }
 
+// 进校申请是否已过有效期：approved 且当前时间超过 进校日期+结束时间（无进校日期的旧申请视为过期）
+function isRequestExpired(r) {
+  if (!r || r.status !== 'approved') return false;
+  if (!r.entryDate) return true;
+  const endStr = (r.entryDate + ' ' + (r.entryEndTime || '23:59')).replace(/-/g, '/');
+  return Date.now() > new Date(endStr).getTime();
+}
+
 exports.main = async (event, context) => {
   const { action, data, id, status, reason, keyword, token, secret } = event;
 
@@ -342,7 +350,7 @@ exports.main = async (event, context) => {
         .orderBy('createdAt', 'desc')
         .limit(data && data.limit ? data.limit : 50)
         .get();
-      return { success: true, data: result.data };
+      return { success: true, data: result.data.map(r => ({ ...r, isExpired: isRequestExpired(r) })) };
     }
 
     case 'logout': {
@@ -372,7 +380,7 @@ exports.main = async (event, context) => {
         query = query.where({ status });
       }
       const result = await query.orderBy('createdAt', 'desc').limit(200).get();
-      return { success: true, data: result.data };
+      return { success: true, data: result.data.map(r => ({ ...r, isExpired: isRequestExpired(r) })) };
     }
 
     case 'addRequest': {

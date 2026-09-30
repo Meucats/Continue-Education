@@ -33,10 +33,8 @@ Page({
       wx.hideLoading();
       const now = new Date();
       const requests = (res.data || []).map(item => {
-          let isExpired = false;
-          if (item.status === 'approved' && item.entryEndTime) {
-            isExpired = now > new Date(item.entryEndTime);
-          }
+          const isExpired = item.status === 'approved' &&
+            (!item.entryDate || now > new Date((item.entryDate + ' ' + (item.entryEndTime || '23:59')).replace(/-/g, '/')));
           return {
             ...item,
             createdAtText: this.formatDate(item.createdAt),

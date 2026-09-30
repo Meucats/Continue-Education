@@ -2965,7 +2965,8 @@ function renderRequests(requests) {
     const now = new Date();
     const statusMap = { pending: ['待审核', 'tag-pending'], approved: ['已通过', 'tag-approved'], rejected: ['已拒绝', 'tag-rejected'] };
     tbody.innerHTML = requests.map(r => {
-        const isExpired = r.status === 'approved' && r.entryEndTime && now > new Date(r.entryEndTime);
+        const isExpired = r.status === 'approved' &&
+            (!r.entryDate || now > new Date((r.entryDate + ' ' + (r.entryEndTime || '23:59')).replace(/-/g, '/')));
         let statusText, statusClass;
         if (isExpired) { statusText = '已过期'; statusClass = 'tag-expired'; }
         else { [statusText, statusClass] = statusMap[r.status] || ['未知', '']; }

@@ -98,12 +98,11 @@ Page({
       const list = (res && res.success && res.data) ? res.data : [];
       if (list.length > 0) {
         const req = list[0];
-          let isExpired = false;
-          if (req.status === 'approved' && req.entryEndTime) {
-            isExpired = new Date() > new Date(req.entryEndTime);
-          }
-          const isWarm = req.status === 'approved' && !isExpired;
-          this.setData({ requestInfo: req, isRequestExpired: isExpired, isWarm: isWarm });
+        // 已通过且已过 进校日期+结束时间（无进校日期的旧申请视为过期）
+        const isExpired = req.status === 'approved' &&
+          (!req.entryDate || new Date() > new Date((req.entryDate + ' ' + (req.entryEndTime || '23:59')).replace(/-/g, '/')));
+        const isWarm = req.status === 'approved' && !isExpired;
+        this.setData({ requestInfo: req, isRequestExpired: isExpired, isWarm: isWarm });
           wx.setNavigationBarColor({
             frontColor: '#ffffff',
             backgroundColor: isWarm ? '#C2410C' : '#1558C7',

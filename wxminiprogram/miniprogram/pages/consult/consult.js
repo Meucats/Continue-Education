@@ -56,11 +56,8 @@ Page({
     this.fetchMyRequests().then(list => {
       if (list.length > 0) {
         const req = list[0];
-        let isExpired = false;
-        if (req.status === 'approved' && req.entryEndTime) {
-          const endTime = new Date(req.entryEndTime);
-          isExpired = now > endTime;
-        }
+        const isExpired = req.status === 'approved' &&
+          (!req.entryDate || now > new Date((req.entryDate + ' ' + (req.entryEndTime || '23:59')).replace(/-/g, '/')));
         this.setData({ existingRequest: req, isExpired: isExpired });
       } else {
         this.setData({ existingRequest: null, isExpired: false });
@@ -78,10 +75,8 @@ Page({
     const now = new Date();
     this.fetchMyRequests().then(list => {
       const history = list.slice(0, 20).map(item => {
-        let isExpired = false;
-        if (item.status === 'approved' && item.entryEndTime) {
-          isExpired = now > new Date(item.entryEndTime);
-        }
+        const isExpired = item.status === 'approved' &&
+          (!item.entryDate || now > new Date((item.entryDate + ' ' + (item.entryEndTime || '23:59')).replace(/-/g, '/')));
         return { ...item, isExpired };
       });
       this.setData({ historyRequests: history });
