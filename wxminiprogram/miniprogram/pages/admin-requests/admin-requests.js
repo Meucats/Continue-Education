@@ -18,14 +18,10 @@ Page({
     wx.showLoading({ title: '加载中...' });
     callAdminApi('getRequests').then(res => {
       wx.hideLoading();
-      const requests = (res.data || []).map(item => {
-          const isExpired = util.isRequestExpired(item);
-          return {
-            ...item,
-            createdAtText: util.formatDateTime(item.createdAt),
-            isExpired: isExpired
-          };
-        });
+      const requests = (res.data || []).map(item => ({
+          ...item,
+          createdAtText: util.formatDateTime(item.createdAt)
+        }));
         this.setData({ requests: requests });
         this.filterRequests();
         this.updatePendingCount();

@@ -36,9 +36,6 @@ const hasActiveCourse = (students) => {
   return students.some(s => !isCourseExpired(s.deadline, s.courseEndDate));
 };
 
-const isRequestExpired = req => !!(req && req.status === 'approved' &&
-  (!req.entryDate || new Date() > new Date((req.entryDate + ' ' + (req.entryEndTime || '23:59')).replace(/-/g, '/'))));
-
 const ensureAdmin = () => {
   const app = getApp();
   if (!app.globalData.isAdmin) {
@@ -61,7 +58,6 @@ module.exports = {
   formatDateTime,
   isCourseExpired,
   hasActiveCourse,
-  isRequestExpired,
   ensureAdmin,
   setWarmNavColor
 };

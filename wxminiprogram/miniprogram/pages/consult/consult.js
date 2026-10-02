@@ -1,5 +1,4 @@
 const app = getApp();
-const util = require('../../utils/util.js');
 const { callUserApi, callAdminApi } = require('../../utils/api.js');
 
 Page({
@@ -42,8 +41,8 @@ Page({
       const req = list.length > 0 ? list[0] : null;
       this.setData({
         existingRequest: req,
-        isExpired: req ? util.isRequestExpired(req) : false,
-        historyRequests: list.slice(0, 20).map(item => ({ ...item, isExpired: util.isRequestExpired(item) }))
+        isExpired: req ? !!req.isExpired : false,
+        historyRequests: list.slice(0, 20)
       });
       return list;
     }).catch(() => {});

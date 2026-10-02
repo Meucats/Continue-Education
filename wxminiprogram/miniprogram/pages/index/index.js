@@ -94,7 +94,7 @@ Page({
       if (list.length > 0) {
         const req = list[0];
         // 已通过且已过 进校日期+结束时间（无进校日期的旧申请视为过期）
-        const isExpired = util.isRequestExpired(req);
+        const isExpired = !!req.isExpired;
         isWarm = req.status === 'approved' && !isExpired;
         this.setData({ requestInfo: req, isRequestExpired: isExpired, isWarm: isWarm });
       } else {
