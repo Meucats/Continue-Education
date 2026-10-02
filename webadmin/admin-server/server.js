@@ -202,8 +202,38 @@ async function callCloudFunction(action, params = {}) {
     }
     throw new Error('云函数调用失败: ' + JSON.stringify(result));
   }
-  throw new Error('云函数调用失败: ' + JSON.stringify(lastErr));
+    throw new Error('云函数调用失败: ' + JSON.stringify(lastErr));
 }
+
+// ====== 云函数代理工厂 ======
+// 同构路由统一：try/catch + callCloudFunction + res.json；middlewares 前置鉴权，
+// before 返回真 = 已自行写响应即短路（如「不能删自己」前置）。
+function proxy(action, pickParams, middlewares = [], before) {
+  const handler = async (req, res) => {
+    try {
+      if (before && await before(req, res)) return;
+      const result = await callCloudFunction(action, pickParams(req));
+      res.json(result);
+    } catch (err) {
+      res.json({ success: false, message: err.message });
+    }
+  };
+  return [...middlewares, handler];
+}
+
+// 人员范围过滤参数（getStudents/getRequests/getAccounts/getStats/getClasses 共用）
+const actorParams = req => ({ actorRole: req.admin.role, actorClasses: req.admin.classes || [] });
+
+// before 钩子：目标管理员 == 当前登录人则按给定文案拒绝（deleteAdmin / resetAdminPassword 同构前置）
+const rejectSelf = message => async (req, res) => {
+  const list = await callCloudFunction('getAdmins');
+  const target = (list && list.data || []).find(a => a._id === req.params.id);
+  if (target && target.phone === req.admin.phone) {
+    res.json({ success: false, message });
+    return true;
+  }
+  return false;
+};
 
 function httpGet(url) {
   return new Promise((resolve, reject) => {
@@ -308,23 +338,9 @@ app.post('/api/admin/change-password', async (req, res) => {
 });
 
 // ====== 管理员管理（数据统一存云端 admins 集合，需超管权限） ======
-app.get('/api/admins', async (req, res) => {
-  try {
-    const result = await callCloudFunction('getAdmins');
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.get('/api/admins', ...proxy('getAdmins', () => ({})));
 
-app.post('/api/admins', requireSuperadmin, async (req, res) => {
-  try {
-    const result = await callCloudFunction('addAdmin', { data: req.body });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.post('/api/admins', ...proxy('addAdmin', req => ({ data: req.body }), [requireSuperadmin]));
 
 app.put('/api/admins/:id', requireSuperadminOrSelf, async (req, res) => {
   try {
@@ -371,89 +387,23 @@ app.put('/api/admins/:id', requireSuperadminOrSelf, async (req, res) => {
   }
 });
 
-app.delete('/api/admins/:id', requireSuperadmin, async (req, res) => {
-  try {
-    const list = await callCloudFunction('getAdmins');
-    const target = (list && list.data || []).find(a => a._id === req.params.id);
-    if (target && target.phone === req.admin.phone) {
-      return res.json({ success: false, message: '不能删除自己的账号' });
-    }
-    const result = await callCloudFunction('deleteAdmin', { id: req.params.id });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.delete('/api/admins/:id', ...proxy('deleteAdmin', req => ({ id: req.params.id }), [requireSuperadmin], rejectSelf('不能删除自己的账号')));
 
 // ====== 重置管理员密码（账号=密码=手机号，重置后对方首登强制改密） ======
-app.post('/api/admins/:id/reset-password', requireSuperadmin, async (req, res) => {
-  try {
-    const list = await callCloudFunction('getAdmins');
-    const target = (list && list.data || []).find(a => a._id === req.params.id);
-    if (target && target.phone === req.admin.phone) {
-      return res.json({ success: false, message: '不能重置自己的账号，请使用修改密码功能' });
-    }
-    const result = await callCloudFunction('resetAdminPassword', { id: req.params.id });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.post('/api/admins/:id/reset-password', ...proxy('resetAdminPassword', req => ({ id: req.params.id }), [requireSuperadmin], rejectSelf('不能重置自己的账号，请使用修改密码功能')));
 
-app.post('/api/admins/init', requireSuperadmin, async (req, res) => {
-  try {
-    const result = await callCloudFunction('initDefaultAdmin');
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.post('/api/admins/init', ...proxy('initDefaultAdmin', () => ({}), [requireSuperadmin]));
 
 // ====== 学员管理 ======
-app.get('/api/students', async (req, res) => {
-  try {
-    const result = await callCloudFunction('getStudents', { keyword: req.query.keyword, actorRole: req.admin.role, actorClasses: req.admin.classes || [] });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.get('/api/students', ...proxy('getStudents', req => ({ keyword: req.query.keyword, ...actorParams(req) })));
 
-app.post('/api/students', async (req, res) => {
-  try {
-    const result = await callCloudFunction('addStudent', { data: req.body });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.post('/api/students', ...proxy('addStudent', req => ({ data: req.body })));
 
-app.put('/api/students/:id', async (req, res) => {
-  try {
-    const result = await callCloudFunction('updateStudent', { data: { _id: req.params.id, ...req.body } });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.put('/api/students/:id', ...proxy('updateStudent', req => ({ data: { _id: req.params.id, ...req.body } })));
 
-app.delete('/api/students/:id', async (req, res) => {
-  try {
-    const result = await callCloudFunction('deleteStudent', { id: req.params.id });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.delete('/api/students/:id', ...proxy('deleteStudent', req => ({ id: req.params.id })));
 
-app.post('/api/students/batch-delete', async (req, res) => {
-  try {
-    const result = await callCloudFunction('batchDeleteStudents', { data: req.body });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.post('/api/students/batch-delete', ...proxy('batchDeleteStudents', req => ({ data: req.body })));
 
 // ====== Excel 导入 ======
 app.post('/api/import', upload.single('file'), async (req, res) => {
@@ -643,172 +593,84 @@ function generateCourseDatesMulti(schedule, startDate, endDate) {
 }
 
 // ====== 入校申请 ======
-app.get('/api/requests', async (req, res) => {
-  try {
-    const result = await callCloudFunction('getRequests', { status: req.query.status, actorRole: req.admin.role, actorClasses: req.admin.classes || [] });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.get('/api/requests', ...proxy('getRequests', req => ({ status: req.query.status, ...actorParams(req) })));
 
-app.post('/api/requests', async (req, res) => {
-  try {
-    const result = await callCloudFunction('addRequest', { data: req.body });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.post('/api/requests', ...proxy('addRequest', req => ({ data: req.body })));
 
-app.post('/api/requests/:id/approve', async (req, res) => {
-  try {
-    const result = await callCloudFunction('approveRequest', { id: req.params.id });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.post('/api/requests/:id/approve', ...proxy('approveRequest', req => ({ id: req.params.id })));
 
-app.post('/api/requests/:id/reject', async (req, res) => {
-  try {
-    const result = await callCloudFunction('rejectRequest', { id: req.params.id, reason: req.body.reason });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.post('/api/requests/:id/reject', ...proxy('rejectRequest', req => ({ id: req.params.id, reason: req.body.reason })));
 
 // ====== 账户管理 ======
-app.post('/api/students/:id/reset-password', async (req, res) => {
-  try {
-    const result = await callCloudFunction('resetPassword', { id: req.params.id });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.post('/api/students/:id/reset-password', ...proxy('resetPassword', req => ({ id: req.params.id })));
 
-app.get('/api/accounts', async (req, res) => {
-  try {
-    const result = await callCloudFunction('getAccounts', { actorRole: req.admin.role, actorClasses: req.admin.classes || [] });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.get('/api/accounts', ...proxy('getAccounts', req => actorParams(req)));
 
-app.post('/api/accounts/sync', async (req, res) => {
-  try {
-    const result = await callCloudFunction('syncAccounts');
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.post('/api/accounts/sync', ...proxy('syncAccounts', () => ({})));
 
 // ====== 统计 ======
-app.get('/api/stats/detail', async (req, res) => {
-  try {
-    const result = await callCloudFunction('getStats', { actorRole: req.admin.role, actorClasses: req.admin.classes || [] });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.get('/api/stats/detail', ...proxy('getStats', req => actorParams(req)));
 
 // ====== 导出/下载 ======
 // 10列正式Excel导出；3列CSV快速复制在小程序 admin-accounts.onExport（互链，两处口径不同勿合并）
+
+// 学员导出与导入模板共用 10 列列宽；表头字面两处不同（导出用「身份证/公司」短名、模板用「身份证号码/公司名称」全名）勿合并，改动时两处互相同步
+const STUDENT_XLSX_COLS = [{ wch: 10 }, { wch: 15 }, { wch: 22 }, { wch: 25 }, { wch: 20 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }];
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+// xlsx 下载组装：aoa → sheet(+列宽) → workbook → 附件响应
+function sendXlsx(res, { rows, cols, sheetName, disposition }) {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  if (cols) ws['!cols'] = cols;
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Disposition', disposition);
+  res.setHeader('Content-Type', XLSX_MIME);
+  res.send(buf);
+}
+
 app.get('/api/export/students', async (req, res) => {
   try {
-    const result = await callCloudFunction('getStudents', { actorRole: req.admin.role, actorClasses: req.admin.classes || [] });
+    const result = await callCloudFunction('getStudents', actorParams(req));
     if (!result.success) return res.status(500).send('导出失败');
-    const data = [['姓名', '联系电话', '身份证', '公司', '班级名称', '上课时间段', '课程开始日期', '课程结束日期', '上课截止时间', '上课地点']];
-    result.data.forEach(s => data.push([s.name, s.phone, s.idCard || '', s.company || '', s.className, s.schedule, s.courseStartDate || '', s.courseEndDate || '', s.deadline, s.location]));
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 22 }, { wch: 25 }, { wch: 20 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }];
-    XLSX.utils.book_append_sheet(wb, ws, '学员信息');
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-    res.setHeader('Content-Disposition', 'attachment; filename=students.xlsx');
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.send(buf);
+    const rows = [['姓名', '联系电话', '身份证', '公司', '班级名称', '上课时间段', '课程开始日期', '课程结束日期', '上课截止时间', '上课地点']];
+    result.data.forEach(s => rows.push([s.name, s.phone, s.idCard || '', s.company || '', s.className, s.schedule, s.courseStartDate || '', s.courseEndDate || '', s.deadline, s.location]));
+    sendXlsx(res, { rows, cols: STUDENT_XLSX_COLS, sheetName: '学员信息', disposition: 'attachment; filename=students.xlsx' });
   } catch (err) {
     res.status(500).send(err.message);
   }
 });
 
 app.get('/api/template/download', (req, res) => {
-  const data = [
+  const rows = [
     ['姓名', '联系电话', '身份证号码', '公司名称', '班级名称', '上课时间段', '课程开始日期', '课程结束日期', '上课截止时间', '上课地点'],
     ['张三', '13800138001', '330102199001011234', '杭州科技有限公司', '计算机基础班', '周一上午 9:00-11:00', '2026-09-01', '2026-12-31', '2026-12-31', '教学楼301教室'],
     ['李四', '13800138002', '330102199505052345', '浙江信息工程有限公司', '会计实务班', '周三下午 14:00-16:00, 周五上午 9:00-11:00', '2026-09-01', '2026-12-31', '2026-12-31', '实训楼205教室'],
     ['王五', '13800138003', '330102198808083456', '杭州教育发展有限公司', '英语提高班', '周二晚上 18:30-20:30, 周四晚上 18:30-20:30', '2026-09-01', '2026-12-31', '2026-12-31', '外语楼102教室']
   ];
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{ wch: 10 }, { wch: 15 }, { wch: 22 }, { wch: 25 }, { wch: 20 }, { wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }];
-  XLSX.utils.book_append_sheet(wb, ws, '学员信息');
-  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-  res.setHeader('Content-Disposition', "attachment; filename*=UTF-8''%E5%AD%A6%E5%91%98%E4%BF%A1%E6%81%AF%E5%AF%BC%E5%85%A5%E6%A8%A1%E6%9D%BF.xlsx");
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.send(buf);
+  sendXlsx(res, { rows, cols: STUDENT_XLSX_COLS, sheetName: '学员信息', disposition: "attachment; filename*=UTF-8''%E5%AD%A6%E5%91%98%E4%BF%A1%E6%81%AF%E5%AF%BC%E5%85%A5%E6%A8%A1%E6%9D%BF.xlsx" });
 });
 
 // ====== 温馨提示 ======
 // 管理员导入模板（姓名 / 电话 / 负责班级）
 app.get('/api/template/admins', (req, res) => {
-  const data = [
+  const rows = [
     ['姓名', '电话', '负责班级'],
     ['张三', '13800138001', '计算机基础班,会计实务班'],
     ['李四', '13800138002', '英语提高班']
   ];
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!cols'] = [{ wch: 12 }, { wch: 16 }, { wch: 40 }];
-  XLSX.utils.book_append_sheet(wb, ws, '管理员');
-  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-  res.setHeader('Content-Disposition', 'attachment; filename=admins.xlsx');
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.send(buf);
+  sendXlsx(res, { rows, cols: [{ wch: 12 }, { wch: 16 }, { wch: 40 }], sheetName: '管理员', disposition: 'attachment; filename=admins.xlsx' });
 });
 
-app.get('/api/tips', async (req, res) => {
-  try {
-    const result = await callCloudFunction('getAllTips');
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.get('/api/tips', ...proxy('getAllTips', () => ({})));
 
-app.post('/api/tips', async (req, res) => {
-  try {
-    const result = await callCloudFunction('updateTip', { data: req.body });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.post('/api/tips', ...proxy('updateTip', req => ({ data: req.body })));
 
-app.delete('/api/tips/:id', async (req, res) => {
-  try {
-    const result = await callCloudFunction('deleteTip', { data: { id: req.params.id } });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.delete('/api/tips/:id', ...proxy('deleteTip', req => ({ data: { id: req.params.id } })));
 
 // ====== 班级列表 ======
-app.get('/api/classes', async (req, res) => {
-  try {
-    const result = await callCloudFunction('getClasses', { actorRole: req.admin.role, actorClasses: req.admin.classes || [] });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
+app.get('/api/classes', ...proxy('getClasses', req => actorParams(req)));
 
 // ====== 管理员批量导入 ======
 app.post('/api/admins/import', upload.single('file'), async (req, res) => {
