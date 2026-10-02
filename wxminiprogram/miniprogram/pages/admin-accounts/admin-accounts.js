@@ -16,11 +16,6 @@ Page({
     searchKey: ''
   },
 
-  onLoad: function () {
-    if (!ensureAdmin()) return;
-    this.loadAccounts();
-  },
-
   onShow: function () {
     if (!ensureAdmin()) return;
     this.loadAccounts();

@@ -17,11 +17,6 @@ Page({
     searchKey: ''
   },
 
-  onLoad: function () {
-    if (!ensureAdmin()) return;
-    this.loadStudents();
-  },
-
   onShow: function () {
     if (!ensureAdmin()) return;
     this.loadStudents();

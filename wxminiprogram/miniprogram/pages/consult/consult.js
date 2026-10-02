@@ -1,4 +1,5 @@
 const app = getApp();
+const util = require('../../utils/util.js');
 const { callUserApi, callAdminApi } = require('../../utils/api.js');
 
 Page({
@@ -22,8 +23,7 @@ Page({
         name: userInfo.name || '',
         phone: userInfo.phone || ''
       });
-      this.checkExistingRequest(userInfo.phone);
-      this.loadHistory(userInfo.phone);
+      this.refreshList();
     }
   },
 
@@ -51,35 +51,21 @@ Page({
     this.setData({ entryEndTime: e.detail.value });
   },
 
-  checkExistingRequest: function (phone) {
-    const now = new Date();
-    this.fetchMyRequests().then(list => {
-      if (list.length > 0) {
-        const req = list[0];
-        const isExpired = req.status === 'approved' &&
-          (!req.entryDate || now > new Date((req.entryDate + ' ' + (req.entryEndTime || '23:59')).replace(/-/g, '/')));
-        this.setData({ existingRequest: req, isExpired: isExpired });
-      } else {
-        this.setData({ existingRequest: null, isExpired: false });
-      }
-    }).catch(() => {});
-  },
-
   fetchMyRequests: function () {
     // 仅登录学员可查看；未登录时 consult 页不加载历史
     if (!app.globalData.userInfo) return Promise.resolve([]);
     return callUserApi('getMyRequests', { limit: 50 }).then(res => (res && res.success && res.data) ? res.data : []);
   },
 
-  loadHistory: function (phone) {
-    const now = new Date();
-    this.fetchMyRequests().then(list => {
-      const history = list.slice(0, 20).map(item => {
-        const isExpired = item.status === 'approved' &&
-          (!item.entryDate || now > new Date((item.entryDate + ' ' + (item.entryEndTime || '23:59')).replace(/-/g, '/')));
-        return { ...item, isExpired };
+  refreshList: function () {
+    return this.fetchMyRequests().then(list => {
+      const req = list.length > 0 ? list[0] : null;
+      this.setData({
+        existingRequest: req,
+        isExpired: req ? util.isRequestExpired(req) : false,
+        historyRequests: list.slice(0, 20).map(item => ({ ...item, isExpired: util.isRequestExpired(item) }))
       });
-      this.setData({ historyRequests: history });
+      return list;
     }).catch(() => {});
   },
 
@@ -123,35 +109,33 @@ Page({
 
     this.setData({ submitting: true });
 
-    this.fetchMyRequests().then(list => {
-      const hasPending = list.some(r => r.status === 'pending');
-      if (hasPending) {
-        wx.showToast({ title: '您已有待审核的申请', icon: 'none' });
-        this.setData({ submitting: false });
-        return;
+    const hasPending = (this.data.historyRequests || []).some(r => r.status === 'pending');
+    if (hasPending) {
+      wx.showToast({ title: '您已有待审核的申请', icon: 'none' });
+      this.setData({ submitting: false });
+      return;
+    }
+
+    callAdminApi('addRequest', {
+      name: name.trim(),
+      phone: phone.trim(),
+      carPlate: carPlate.trim(),
+      entryDate: entryDate,
+      entryStartTime: entryStartTime,
+      entryEndTime: entryEndTime
+    }).then(res => {
+      if (res && res.success) {
+        wx.showToast({ title: '申请已提交', icon: 'success' });
+        this.refreshList();
+      } else {
+        wx.showToast({ title: (res && res.message) || '提交失败，请重试', icon: 'none' });
       }
-      return callAdminApi('addRequest', {
-        name: name.trim(),
-        phone: phone.trim(),
-        carPlate: carPlate.trim(),
-        entryDate: entryDate,
-        entryStartTime: entryStartTime,
-        entryEndTime: entryEndTime
-      }).then(res => {
-        if (res && res.success) {
-          wx.showToast({ title: '申请已提交', icon: 'success' });
-          this.checkExistingRequest(phone);
-          this.loadHistory(phone);
-        } else {
-          wx.showToast({ title: (res && res.message) || '提交失败，请重试', icon: 'none' });
-        }
-        this.setData({ submitting: false });
-      }).catch(err => {
-        wx.showToast({ title: '提交失败，请重试', icon: 'none' });
-        this.setData({ submitting: false });
-        console.error(err);
-      });
-    }).catch(() => { this.setData({ submitting: false }); });
+      this.setData({ submitting: false });
+    }).catch(err => {
+      wx.showToast({ title: '提交失败，请重试', icon: 'none' });
+      this.setData({ submitting: false });
+      console.error(err);
+    });
   },
 
   goBack: function () {

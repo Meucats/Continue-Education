@@ -1,3 +1,4 @@
+const util = require('../../utils/util.js');
 const { callAdminApi } = require('../../utils/api.js');
 const app = getApp();
 
@@ -17,11 +18,6 @@ Page({
     pendingCount: 0
   },
 
-  onLoad: function () {
-    if (!ensureAdmin()) return;
-    this.loadRequests();
-  },
-
   onShow: function () {
     if (!ensureAdmin()) return;
     this.loadRequests();
@@ -31,10 +27,8 @@ Page({
     wx.showLoading({ title: '加载中...' });
     callAdminApi('getRequests').then(res => {
       wx.hideLoading();
-      const now = new Date();
       const requests = (res.data || []).map(item => {
-          const isExpired = item.status === 'approved' &&
-            (!item.entryDate || now > new Date((item.entryDate + ' ' + (item.entryEndTime || '23:59')).replace(/-/g, '/')));
+          const isExpired = util.isRequestExpired(item);
           return {
             ...item,
             createdAtText: this.formatDate(item.createdAt),

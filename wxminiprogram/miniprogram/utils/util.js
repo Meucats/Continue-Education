@@ -37,9 +37,13 @@ const hasActiveCourse = (students) => {
   return students.some(s => !isCourseExpired(s.deadline, s.courseEndDate));
 };
 
+const isRequestExpired = req => !!(req && req.status === 'approved' &&
+  (!req.entryDate || new Date() > new Date((req.entryDate + ' ' + (req.entryEndTime || '23:59')).replace(/-/g, '/'))));
+
 module.exports = {
   formatTime,
   formatDate,
   isCourseExpired,
-  hasActiveCourse
+  hasActiveCourse,
+  isRequestExpired
 };

@@ -48,8 +48,7 @@ Page({
       const list = (res && res.success && res.data) ? res.data : [];
       if (list.length > 0) {
         const req = list[0];
-        const isExpired = req.status === 'approved' &&
-          (!req.entryDate || new Date() > new Date((req.entryDate + ' ' + (req.entryEndTime || '23:59')).replace(/-/g, '/')));
+        const isExpired = util.isRequestExpired(req);
         isWarm = req.status === 'approved' && !isExpired;
       }
       this.setData({ isWarm: isWarm });

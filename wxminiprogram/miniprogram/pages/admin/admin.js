@@ -20,7 +20,6 @@ Page({
         isAdmin: true,
         adminInfo: app.globalData.adminInfo
       });
-      this.loadStats();
     }
   },
 
