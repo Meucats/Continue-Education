@@ -136,8 +136,8 @@
                 <div class="nav-item" onclick="switchPage('students', this)">
                     <span class="nav-icon"><svg class="ico"><use href="#i-users"/></svg></span> 学员列表
                 </div>
-                <div class="nav-item" onclick="switchPage('import', this)">
-                    <span class="nav-icon"><svg class="ico"><use href="#i-upload"/></svg></span> 批量导入
+                <div class="nav-item" onclick="switchPage('accounts', this)">
+                    <span class="nav-icon"><svg class="ico"><use href="#i-key"/></svg></span> 学员账户
                 </div>
             </div>
             <div class="nav-section">
@@ -154,9 +154,6 @@
                 </div>
                 <div class="nav-item" onclick="switchPage('tips', this)">
                     <span class="nav-icon"><svg class="ico"><use href="#i-bulb"/></svg></span> 温馨提示
-                </div>
-                <div class="nav-item" onclick="switchPage('accounts', this)">
-                    <span class="nav-icon"><svg class="ico"><use href="#i-key"/></svg></span> 账户管理
                 </div>
             </div>
         </div>
@@ -256,7 +253,7 @@
                             <div class="action-icon"><svg class="ico"><use href="#i-plus"/></svg></div>
                             <div class="action-text">添加学员</div>
                         </div>
-                        <div class="action-card" onclick="switchPage('import', document.querySelectorAll('.nav-item')[2])">
+                        <div class="action-card" onclick="showImportModal()">
                             <div class="action-icon"><svg class="ico"><use href="#i-upload"/></svg></div>
                             <div class="action-text">批量导入</div>
                         </div>
@@ -313,13 +310,56 @@
             <!-- ========== 学员管理 ========== -->
             <div id="page-students" class="page-content hidden">
                 <div class="card">
-                    <div class="toolbar">
-                        <div class="search-box">
-                            <input type="text" id="studentSearch" class="search-input" placeholder="搜索姓名、手机号、班级..." onkeyup="searchStudents()">
-                            <button class="btn btn-primary btn-sm" onclick="searchStudents()"><svg class="ico ico-sm"><use href="#i-search"/></svg>搜索</button>
+                    <div class="card-header">
+                        <div class="card-title">筛选条件</div>
+                        <div class="filter-actions">
+                            <button class="btn btn-primary btn-sm" onclick="filterStudents()"><svg class="ico ico-sm"><use href="#i-search"/></svg>检索</button>
+                            <button class="btn btn-secondary btn-sm" onclick="resetStuFilter()">重置</button>
+                            <span id="stuFilterCount" class="filter-count"></span>
                         </div>
-                        <div class="toolbar-group">
+                    </div>
+                    <div class="filter-grid" onkeydown="if(event.key==='Enter'){event.preventDefault();filterStudents();}">
+                        <div class="form-group">
+                            <label class="form-label" for="fStuName">姓名</label>
+                            <div class="ac-box">
+                                <input type="text" id="fStuName" class="form-input" placeholder="输入姓名或电话，下拉选择" autocomplete="off" oninput="acInput('stu')" onkeydown="acKey(event,'stu')" onfocus="acRender('stu')" onblur="acClose('stu')" onclick="acRender('stu')">
+                                <div id="acStuList" class="ac-list hidden" role="listbox"></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="fStuIdCard">身份证</label>
+                            <input type="text" id="fStuIdCard" class="form-input" placeholder="输入几位即可" >
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="fStuCompany">公司</label>
+                            <select id="fStuCompany" class="form-input" >
+                                <option value="">全部公司</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="fStuClass">班级</label>
+                            <select id="fStuClass" class="form-input" >
+                                <option value="">全部班级</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="fStuSchedule">上课时间</label>
+                            <input type="text" id="fStuSchedule" class="form-input" placeholder="如 周六上午" >
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="fStuLocation">上课地点</label>
+                            <select id="fStuLocation" class="form-input" >
+                                <option value="">全部地点</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">学员列表</div>
+                        <div class="toolbar-group" style="margin-left:auto;">
                             <button class="btn btn-primary btn-sm" onclick="showAddStudentModal()"><svg class="ico ico-sm"><use href="#i-plus"/></svg>添加学员</button>
+                            <button class="btn btn-secondary btn-sm" onclick="showImportModal()"><svg class="ico ico-sm"><use href="#i-upload"/></svg>批量导入</button>
                             <button class="btn btn-danger btn-sm" onclick="batchDeleteStudents()"><svg class="ico ico-sm"><use href="#i-trash"/></svg>批量删除</button>
                             <a href="/api/export/students" class="btn btn-secondary btn-sm" onclick="downloadWithAuth('/api/export/students','学员信息.xlsx');return false;"><svg class="ico ico-sm"><use href="#i-download"/></svg>导出 Excel</a>
                         </div>
@@ -349,71 +389,17 @@
                 </div>
             </div>
 
-            <!-- ========== 批量导入 ========== -->
-            <div id="page-import" class="page-content hidden">
-                <div class="info-banner">
-                    <span class="banner-icon"><svg class="ico"><use href="#i-info"/></svg></span>
-                    <div>
-                        <strong>导入说明：</strong>支持自定义 Excel 模板，系统会自动识别常见表头名称。<br>
-                        必须包含字段：<strong>姓名、联系电话、班级名称、上课时间段、课程开始日期、课程结束日期、上课地点</strong><br>
-                        可选字段：<strong>身份证号码、公司名称</strong>（表头需包含“身份证”或“公司”关键词）<br>
-                        上课时间段支持逗号分隔多时间段，如：<strong>周三下午 14:00-16:00, 周五上午 9:00-11:00</strong><br>
-                        系统会根据上课时间段中的星期几和课程开始/结束日期自动生成每节课的具体日期。如手机号已存在，系统会自动更新该学员信息。
-                    </div>
-                </div>
-
-                <div class="template-download-card">
-                    <div class="template-info">
-                        <div class="template-icon"><svg class="ico"><use href="#i-file"/></svg></div>
-                        <div class="template-detail">
-                            <div class="template-title">Excel 导入模板</div>
-                            <div class="template-desc">包含标准表头和示例数据，下载后填写学员信息即可导入</div>
-                        </div>
-                    </div>
-                    <a href="javascript:void(0)" onclick="downloadWithAuth('/api/template/download','学员导入模板.xlsx')" class="btn btn-primary">
-                        <svg class="ico ico-sm"><use href="#i-download"/></svg>下载模板
-                    </a>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">上传 Excel 文件</div>
-                    </div>
-                    <div class="upload-zone" id="uploadZone">
-                        <div class="upload-icon"><svg class="ico"><use href="#i-upload"/></svg></div>
-                        <div class="upload-text" id="uploadText">点击下方按钮或拖拽 Excel 文件到此处</div>
-                        <div class="upload-hint">支持 .xlsx、.xls 格式，单次最大支持 5000 条数据</div>
-                    </div>
-                    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none" onchange="handleFileSelect(event)">
-
-                    <div id="selectedFileBox" class="selected-file-box hidden">
-                        <div class="selected-file-info">
-                            <svg class="ico"><use href="#i-clip"/></svg>
-                            <span class="file-name" id="selectedFileName"></span>
-                            <span class="file-size" id="selectedFileSize"></span>
-                        </div>
-                        <div class="selected-file-actions">
-                            <button class="btn btn-secondary btn-sm" onclick="clearSelectedFile()">重新选择</button>
-                            <button class="btn btn-primary btn-sm" id="confirmImportBtn" onclick="confirmImport()">确认导入</button>
-                        </div>
-                    </div>
-
-                    <div id="importResult"></div>
-                </div>
-            </div>
-
             <!-- ========== 入校申请 ========== -->
             <div id="page-requests" class="page-content hidden">
                 <div class="card">
-                    <div class="toolbar">
-                        <div class="search-box">
-                            <select id="requestFilter" class="search-input" onchange="loadRequests()" aria-label="按状态筛选">
-                                <option value="all">全部</option>
-                                <option value="pending">待审核</option>
-                                <option value="approved">已通过</option>
-                                <option value="rejected">已拒绝</option>
-                            </select>
-                        </div>
+                    <div class="card-header">
+                        <div class="card-title">申请列表</div>
+                        <select id="requestFilter" class="search-input" onchange="loadRequests()" aria-label="按状态筛选">
+                            <option value="all">全部状态</option>
+                            <option value="pending">待审核</option>
+                            <option value="approved">已通过</option>
+                            <option value="rejected">已拒绝</option>
+                        </select>
                     </div>
                     <div id="requestsTruncHint" class="trunc-hint hidden"></div>
                     <div class="table-container">
@@ -438,6 +424,39 @@
 
             <!-- ========== 管理员管理 ========== -->
             <div id="page-admin-manage" class="page-content hidden">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">筛选条件</div>
+                        <div class="filter-actions">
+                            <button class="btn btn-primary btn-sm" onclick="filterAdmins()"><svg class="ico ico-sm"><use href="#i-search"/></svg>检索</button>
+                            <button class="btn btn-secondary btn-sm" onclick="resetAdmFilter()">重置</button>
+                            <span id="admFilterCount" class="filter-count"></span>
+                        </div>
+                    </div>
+                    <div class="filter-grid" onkeydown="if(event.key==='Enter'){event.preventDefault();filterAdmins();}">
+                        <div class="form-group">
+                            <label class="form-label" for="fAdmName">姓名</label>
+                            <div class="ac-box">
+                                <input type="text" id="fAdmName" class="form-input" placeholder="输入姓名或账号，下拉选择" autocomplete="off" oninput="acInput('adm')" onkeydown="acKey(event,'adm')" onfocus="acRender('adm')" onblur="acClose('adm')" onclick="acRender('adm')">
+                                <div id="acAdmList" class="ac-list hidden" role="listbox"></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="fAdmRole">角色</label>
+                            <select id="fAdmRole" class="form-input" >
+                                <option value="">全部角色</option>
+                                <option value="superadmin">超级管理员</option>
+                                <option value="admin">管理员</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="fAdmClass">负责班级</label>
+                            <select id="fAdmClass" class="form-input" >
+                                <option value="">全部班级</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">管理员列表</div>
@@ -491,6 +510,45 @@
             <div id="page-accounts" class="page-content hidden">
                 <div class="card">
                     <div class="card-header">
+                        <div class="card-title">筛选条件</div>
+                        <div class="filter-actions">
+                            <button class="btn btn-primary btn-sm" onclick="filterAccounts()"><svg class="ico ico-sm"><use href="#i-search"/></svg>检索</button>
+                            <button class="btn btn-secondary btn-sm" onclick="resetAccFilter()">重置</button>
+                            <span id="accFilterCount" class="filter-count"></span>
+                        </div>
+                    </div>
+                    <div class="filter-grid" onkeydown="if(event.key==='Enter'){event.preventDefault();filterAccounts();}">
+                        <div class="form-group">
+                            <label class="form-label" for="fAccName">姓名</label>
+                            <div class="ac-box">
+                                <input type="text" id="fAccName" class="form-input" placeholder="输入姓名或电话，下拉选择" autocomplete="off" oninput="acInput('acc')" onkeydown="acKey(event,'acc')" onfocus="acRender('acc')" onblur="acClose('acc')" onclick="acRender('acc')">
+                                <div id="acAccList" class="ac-list hidden" role="listbox"></div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="fAccCompany">公司</label>
+                            <select id="fAccCompany" class="form-input" >
+                                <option value="">全部公司</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="fAccClass">班级</label>
+                            <select id="fAccClass" class="form-input" >
+                                <option value="">全部班级</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="fAccSchedule">上课时间</label>
+                            <input type="text" id="fAccSchedule" class="form-input" placeholder="如 周六上午" >
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="fAccCreated">创建时间</label>
+                            <input type="text" id="fAccCreated" class="form-input" placeholder="如 2026-09 或 2026/9" >
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
                         <div class="card-title">账户列表</div>
                         <button class="btn btn-primary btn-sm" onclick="syncAccounts()"><svg class="ico ico-sm"><use href="#i-refresh"/></svg>从学员列表同步</button>
                     </div>
@@ -500,8 +558,10 @@
                             <thead>
                                 <tr>
                                     <th>姓名</th>
-                                    <th>手机号</th>
-                                    <th>角色</th>
+                                    <th>联系电话</th>
+                                    <th>公司</th>
+                                    <th>班级名称</th>
+                                    <th>上课时间</th>
                                     <th>创建时间</th>
                                 </tr>
                             </thead>
@@ -778,6 +838,50 @@
     </div>
 </div>
 
+<!-- ==================== 学员批量导入模态框 ==================== -->
+<div id="studentImportModal" class="modal-overlay">
+    <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal-header">
+            <div class="modal-title">批量导入学员</div>
+            <button class="modal-close" onclick="closeImportModal()" aria-label="关闭"><svg class="ico"><use href="#i-x"/></svg></button>
+        </div>
+        <div class="modal-body">
+            <div class="info-banner" style="margin-bottom:16px;">
+                <span class="banner-icon"><svg class="ico"><use href="#i-info"/></svg></span>
+                <div>
+                    <strong>导入说明：</strong>支持自定义 Excel 模板，系统会自动识别常见表头名称。<br>
+                    必须包含字段：<strong>姓名、联系电话、班级名称、上课时间段、课程开始日期、课程结束日期、上课地点</strong><br>
+                    可选字段：<strong>身份证号码、公司名称</strong>（表头需包含“身份证”或“公司”关键词）<br>
+                    上课时间段支持逗号分隔多时间段，如：<strong>周三下午 14:00-16:00, 周五上午 9:00-11:00</strong><br>
+                    系统会根据上课时间段中的星期几和课程开始/结束日期自动生成每节课的具体日期。如手机号已存在，系统会自动更新该学员信息。
+                </div>
+            </div>
+            <div class="upload-zone" id="uploadZone">
+                <div class="upload-icon"><svg class="ico"><use href="#i-upload"/></svg></div>
+                <div class="upload-text" id="uploadText">点击选择 Excel 文件，或拖拽到此处</div>
+                <div class="upload-hint">支持 .xlsx、.xls 格式，单次最大支持 5000 条数据</div>
+            </div>
+            <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none" onchange="handleFileSelect(event)">
+            <div id="selectedFileBox" class="selected-file-box hidden">
+                <div class="selected-file-info">
+                    <svg class="ico"><use href="#i-clip"/></svg>
+                    <span class="file-name" id="selectedFileName"></span>
+                    <span class="file-size" id="selectedFileSize"></span>
+                </div>
+                <div class="selected-file-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="clearSelectedFile()">重新选择</button>
+                    <button class="btn btn-primary btn-sm" id="confirmImportBtn" onclick="confirmImport()">确认导入</button>
+                </div>
+            </div>
+            <div id="importResult" style="margin-top:12px;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" onclick="downloadWithAuth('/api/template/download','学员导入模板.xlsx')">下载导入模板</button>
+            <button class="btn btn-secondary" onclick="closeImportModal()">关闭</button>
+        </div>
+    </div>
+</div>
+
 <!-- ==================== 管理员导入模态框 ==================== -->
 <div id="adminImportModal" class="modal-overlay">
     <div class="modal" role="dialog" aria-modal="true">
@@ -796,9 +900,20 @@
             </div>
             <div class="upload-zone" id="adminUploadZone" style="padding:24px;">
                 <div class="upload-icon"><svg class="ico"><use href="#i-file"/></svg></div>
-                <div class="upload-text">点击选择 Excel 文件</div>
+                <div class="upload-text">点击选择 Excel 文件，或拖拽到此处</div>
             </div>
             <input type="file" id="adminFileInput" accept=".xlsx,.xls" style="display:none" onchange="handleAdminFileSelect(event)">
+            <div id="adminSelectedFileBox" class="selected-file-box hidden">
+                <div class="selected-file-info">
+                    <svg class="ico"><use href="#i-clip"/></svg>
+                    <span class="file-name" id="adminSelectedFileName"></span>
+                    <span class="file-size" id="adminSelectedFileSize"></span>
+                </div>
+                <div class="selected-file-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="clearAdminSelectedFile()">重新选择</button>
+                    <button class="btn btn-primary btn-sm" id="adminConfirmImportBtn" onclick="confirmAdminImport()">确认导入</button>
+                </div>
+            </div>
             <div id="adminImportResult" style="margin-top:12px;"></div>
         </div>
         <div class="modal-footer">
@@ -913,11 +1028,10 @@ const Motion = (() => {
 const pageConfig = {
     dashboard: { title: '首页概览', desc: '欢迎回来，管理员' },
     students: { title: '学员管理', desc: '管理所有学员的课程信息' },
-    import: { title: '批量导入', desc: '从 Excel 文件批量导入学员数据' },
     requests: { title: '入校申请', desc: '审批学员的入校咨询申请' },
     'admin-manage': { title: '管理员管理', desc: '管理后台管理员账号' },
     tips: { title: '温馨提示', desc: '为班级设置温馨提示' },
-    accounts: { title: '账户管理', desc: '查看和管理学员登录账户' },
+    accounts: { title: '学员账户', desc: '查看学员登录账户与基本信息' },
     profile: { title: '个人主页', desc: '管理本人姓名、账号与密码' }
 };
 
@@ -943,6 +1057,121 @@ function emptyCell(cols, iconId, text, hint) {
         '<div class="empty-text">' + text + '</div>' +
         (hint ? '<div class="empty-hint">' + hint + '</div>' : '') +
         '</div></td></tr>';
+}
+
+// ============ 多条件筛选（可单项可联合，多项按「且」匹配） ============
+function fv(id) {
+    const el = document.getElementById(id);
+    return el ? String(el.value || '').trim() : '';
+}
+function clearFilter(ids) {
+    ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+}
+function setFilterCount(elId, shown, total) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.textContent = shown < total ? `匹配 ${shown} / 共 ${total} 条` : `共 ${total} 条`;
+}
+// 班级下拉选项：来自已有班级接口（受限管理员服务端只返回其负责的班级）
+function loadClassFilterOptions(selectId) {
+    const sel = document.getElementById(selectId);
+    if (!sel || sel.dataset.loaded) return;
+    apiFetch(`${API_BASE}/classes`).then(r => r.json()).then(res => {
+        if (!res.success || !Array.isArray(res.data)) return;
+        const keep = sel.value;
+        sel.innerHTML = '<option value="">全部班级</option>' +
+            res.data.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+        sel.value = keep;
+        sel.dataset.loaded = '1';
+    }).catch(() => {});
+}
+
+// 数据型下拉选项（公司/上课地点等）：取自已加载列表的去重值，保留当前选择
+function loadDataFilterOptions(selectId, values, allLabel) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    const keep = sel.value;
+    const opts = Array.from(new Set((values || []).map(v => String(v || '').trim()).filter(Boolean)))
+        .sort((a, b) => a.localeCompare(b, 'zh'));
+    sel.innerHTML = `<option value="">${allLabel}</option>` +
+        opts.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+    if (keep && opts.indexOf(keep) > -1) sel.value = keep;
+}
+
+// 姓名联想下拉：模糊匹配姓名/联系电话，条目附带电话用于重名消歧；点击条目把姓名填入输入框并锁定该人
+const acState = {
+    stu: { items: [], idx: -1, phone: '' },
+    acc: { items: [], idx: -1, phone: '' },
+    adm: { items: [], idx: -1, phone: '' }
+};
+function acInputId(ctx) { return ctx === 'stu' ? 'fStuName' : ctx === 'acc' ? 'fAccName' : 'fAdmName'; }
+function acListId(ctx) { return ctx === 'stu' ? 'acStuList' : ctx === 'acc' ? 'acAccList' : 'acAdmList'; }
+function acSource(ctx) { return ctx === 'stu' ? allStudents : ctx === 'acc' ? allAccounts : allAdmins; }
+function acRender(ctx) {
+    const input = document.getElementById(acInputId(ctx));
+    const list = document.getElementById(acListId(ctx));
+    if (!input || !list) return;
+    const q = String(input.value || '').trim().toLowerCase();
+    const seen = {};
+    const items = [];
+    (acSource(ctx) || []).forEach(r => {
+        if (items.length >= 8) return;
+        const name = r.name || '', phone = r.phone || '';
+        if (!name) return;
+        const hit = q ? (name.toLowerCase().indexOf(q) > -1 || phone.toLowerCase().indexOf(q) > -1) : true;
+        if (!hit) return;
+        const key = name + '|' + phone;
+        if (seen[key]) return;
+        seen[key] = 1;
+        items.push({ name, phone });
+    });
+    const st = acState[ctx];
+    st.items = items;
+    st.idx = -1;
+    if (items.length === 0) { list.classList.add('hidden'); list.innerHTML = ''; return; }
+    list.innerHTML = items.map((r, i) =>
+        '<div class="ac-item" role="option" onmousedown="acPick(event,\'' + ctx + '\',' + i + ')" onmouseenter="acHover(\'' + ctx + '\',' + i + ')">' +
+        '<span class="ac-name">' + escapeHtml(r.name) + '</span>' +
+        '<span class="ac-phone">' + escapeHtml(r.phone) + '</span></div>').join('');
+    list.classList.remove('hidden');
+}
+function acClose(ctx) {
+    const list = document.getElementById(acListId(ctx));
+    if (list) list.classList.add('hidden');
+    acState[ctx].items = [];
+    acState[ctx].idx = -1;
+}
+function acHover(ctx, i) {
+    acState[ctx].idx = i;
+    const list = document.getElementById(acListId(ctx));
+    if (list) Array.prototype.forEach.call(list.children, (el, j) => el.classList.toggle('ac-active', j === i));
+}
+function acPick(e, ctx, i) {
+    if (e) e.preventDefault();
+    const item = (acState[ctx].items || [])[i];
+    if (!item) return;
+    document.getElementById(acInputId(ctx)).value = item.name;
+    acState[ctx].phone = item.phone;
+    acClose(ctx);
+}
+function acInput(ctx) {
+    acState[ctx].phone = '';
+    acRender(ctx);
+}
+function acKey(e, ctx) {
+    const st = acState[ctx];
+    const items = st.items || [];
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        if (items.length === 0) return;
+        e.preventDefault();
+        st.idx = e.key === 'ArrowDown' ? (st.idx + 1) % items.length : (st.idx <= 0 ? items.length - 1 : st.idx - 1);
+        acHover(ctx, st.idx);
+    } else if (e.key === 'Enter' && st.idx >= 0 && items[st.idx]) {
+        e.preventDefault();
+        acPick(null, ctx, st.idx);
+    } else if (e.key === 'Escape') {
+        acClose(ctx);
+    }
 }
 
 // ============ 登录 ============
@@ -1315,11 +1544,12 @@ function switchPage(page, navEl) {
     document.getElementById('pageDesc').textContent = config.desc;
 
     if (page === 'dashboard') startDashboardLoad();
-    if (page === 'students') loadStudents();
-    if (page === 'requests') loadRequests();
-    if (page === 'admin-manage') loadAdmins();
+    // 每次通过导航进入页面时恢复默认状态（清除上次的筛选/搜索条件）
+    if (page === 'students') { resetStuFilterUI(); loadStudents(); }
+    if (page === 'requests') { const rf = document.getElementById('requestFilter'); if (rf) rf.value = 'all'; loadRequests(); }
+    if (page === 'admin-manage') { resetAdmFilterUI(); loadAdmins(); }
     if (page === 'tips') loadTips();
-    if (page === 'accounts') loadAccounts();
+    if (page === 'accounts') { resetAccFilterUI(); loadAccounts(); }
     if (page === 'profile') loadProfile();
     requestAnimationFrame(() => Motion.pageEntrance(page));
 }
@@ -1475,7 +1705,7 @@ function loadStudents() {
     const tbody = document.getElementById('studentTableBody');
     tbody.innerHTML = skeletonRows(12, 8);
     apiFetch(`${API_BASE}/students`).then(r => r.json()).then(res => {
-        if (res.success) { allStudents = res.data; renderStudents(allStudents); updateTruncHint('studentsTruncHint', res); }
+        if (res.success) { allStudents = res.data; loadClassFilterOptions('fStuClass'); loadDataFilterOptions('fStuCompany', allStudents.map(s => s.company), '全部公司'); loadDataFilterOptions('fStuLocation', allStudents.map(s => s.location), '全部地点'); filterStudents(); updateTruncHint('studentsTruncHint', res); }
         else updateTruncHint('studentsTruncHint', null);
     }).catch(() => { updateTruncHint('studentsTruncHint', null); tbody.innerHTML = emptyCell(12, 'i-alert', '加载失败', '请检查网络后重试'); });
 }
@@ -1509,10 +1739,44 @@ function renderStudents(students) {
     }).join('');
 }
 
-function searchStudents() {
-    const key = document.getElementById('studentSearch').value.trim().toLowerCase();
-    if (!key) { renderStudents(allStudents); return; }
-    renderStudents(allStudents.filter(s => s.name.toLowerCase().includes(key) || s.phone.includes(key) || (s.className && s.className.toLowerCase().includes(key)) || (s.idCard && s.idCard.includes(key)) || (s.company && s.company.toLowerCase().includes(key))));
+function filterStudents() {
+    const q = fv('fStuName').toLowerCase();
+    const pin = acState.stu.phone;
+    const idCard = fv('fStuIdCard');
+    const company = fv('fStuCompany').toLowerCase();
+    const cls = fv('fStuClass');
+    const schedule = fv('fStuSchedule').toLowerCase();
+    const location = fv('fStuLocation').toLowerCase();
+    const active = !!(q || pin || idCard || company || cls || schedule || location);
+    const nameHit = s => pin
+        ? s.phone === pin
+        : (!q || (s.name || '').toLowerCase().includes(q) || (s.phone || '').includes(q));
+    const list = allStudents.filter(s =>
+        nameHit(s) &&
+        (!idCard || (s.idCard || '').includes(idCard)) &&
+        (!company || (s.company || '').trim().toLowerCase() === company) &&
+        (!cls || s.className === cls) &&
+        (!schedule || (s.schedule || '').toLowerCase().includes(schedule)) &&
+        (!location || (s.location || '').trim().toLowerCase() === location)
+    );
+    setFilterCount('stuFilterCount', list.length, allStudents.length);
+    if (active && list.length === 0) {
+        document.getElementById('studentTableBody').innerHTML = emptyCell(12, 'i-search', '无匹配的学员', '可减少条件，或点击「重置」恢复全部');
+        return;
+    }
+    renderStudents(list);
+}
+
+function resetStuFilterUI() {
+    clearFilter(['fStuName', 'fStuIdCard', 'fStuCompany', 'fStuClass', 'fStuSchedule', 'fStuLocation']);
+    acState.stu.phone = '';
+    acClose('stu');
+    const c = document.getElementById('stuFilterCount');
+    if (c) c.textContent = '';
+}
+function resetStuFilter() {
+    resetStuFilterUI();
+    filterStudents();
 }
 
 function toggleCheckAll() {
@@ -1649,7 +1913,7 @@ function resetPassword(id) {
 function deleteStudent(id) {
     const s = allStudents.find(x => x._id === id);
     const name = s ? s.name : '';
-    if (!confirm(`确定要删除学员「${name}」吗？此操作不可恢复。`)) return;
+    if (!confirm(`确定要删除学员「${name}」吗？其登录账户将同步删除，此操作不可恢复。`)) return;
     apiFetch(`${API_BASE}/students/${id}`, { method: 'DELETE' }).then(r => r.json()).then(res => {
         if (res.success) { showToast('删除成功'); loadStudents(); } else showToast(res.message, 'error');
     });
@@ -1658,7 +1922,7 @@ function deleteStudent(id) {
 function batchDeleteStudents() {
     const ids = [...document.querySelectorAll('.stu-check:checked')].map(cb => cb.value);
     if (ids.length === 0) return showToast('请先勾选要删除的学员', 'error');
-    if (!confirm(`确定要删除选中的 ${ids.length} 名学员吗？`)) return;
+    if (!confirm(`确定要删除选中的 ${ids.length} 名学员吗？其登录账户将同步删除，此操作不可恢复。`)) return;
     apiFetch(`${API_BASE}/students/batch-delete`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids })
     }).then(r => r.json()).then(res => {
@@ -1667,6 +1931,14 @@ function batchDeleteStudents() {
 }
 
 // ============ Excel 导入 ============
+// ============ 学员批量导入（模态框） ============
+function showImportModal() {
+    document.getElementById('importResult').innerHTML = '';
+    clearSelectedFile();
+    document.getElementById('studentImportModal').classList.add('show');
+}
+function closeImportModal() { document.getElementById('studentImportModal').classList.remove('show'); }
+
 let selectedFile = null;
 
 const uploadZone = document.getElementById('uploadZone');
@@ -1801,20 +2073,61 @@ function confirmReject() {
     });
 }
 
-// ============ 账户管理 ============
+// ============ 学员账户 ============
+let allAccounts = [];
+
 function loadAccounts() {
     const tbody = document.getElementById('accountTableBody');
-    tbody.innerHTML = skeletonRows(4, 6);
+    tbody.innerHTML = skeletonRows(6, 6);
     apiFetch(`${API_BASE}/accounts`).then(r => r.json()).then(res => {
-        if (res.success) { renderAccounts(res.data); updateTruncHint('accountsTruncHint', res); }
+        if (res.success) { allAccounts = res.data; loadClassFilterOptions('fAccClass'); loadDataFilterOptions('fAccCompany', allAccounts.map(a => a.company), '全部公司'); filterAccounts(); updateTruncHint('accountsTruncHint', res); }
         else updateTruncHint('accountsTruncHint', null);
-    }).catch(() => { updateTruncHint('accountsTruncHint', null); tbody.innerHTML = emptyCell(4, 'i-alert', '加载失败'); });
+    }).catch(() => { updateTruncHint('accountsTruncHint', null); tbody.innerHTML = emptyCell(6, 'i-alert', '加载失败'); });
+}
+
+function filterAccounts() {
+    const q = fv('fAccName').toLowerCase();
+    const pin = acState.acc.phone;
+    const company = fv('fAccCompany').toLowerCase();
+    const cls = fv('fAccClass');
+    const schedule = fv('fAccSchedule').toLowerCase();
+    const created = fv('fAccCreated').toLowerCase();
+    const active = !!(q || pin || company || cls || schedule || created);
+    const fmt = t => (t ? new Date(t).toLocaleString('zh-CN') : '');
+    const nameHit = a => pin
+        ? a.phone === pin
+        : (!q || (a.name || '').toLowerCase().includes(q) || (a.phone || '').includes(q));
+    const list = allAccounts.filter(a =>
+        nameHit(a) &&
+        (!company || (a.company || '').trim().toLowerCase() === company) &&
+        (!cls || a.className === cls) &&
+        (!schedule || (a.schedule || '').toLowerCase().includes(schedule)) &&
+        (!created || (fmt(a.createdAt) + ' ' + (a.createdAt || '')).toLowerCase().includes(created))
+    );
+    setFilterCount('accFilterCount', list.length, allAccounts.length);
+    if (active && list.length === 0) {
+        document.getElementById('accountTableBody').innerHTML = emptyCell(6, 'i-search', '无匹配的账户', '可减少条件，或点击「重置」恢复全部');
+        return;
+    }
+    renderAccounts(list);
+}
+
+function resetAccFilterUI() {
+    clearFilter(['fAccName', 'fAccCompany', 'fAccClass', 'fAccSchedule', 'fAccCreated']);
+    acState.acc.phone = '';
+    acClose('acc');
+    const c = document.getElementById('accFilterCount');
+    if (c) c.textContent = '';
+}
+function resetAccFilter() {
+    resetAccFilterUI();
+    filterAccounts();
 }
 
 function renderAccounts(accounts) {
     const tbody = document.getElementById('accountTableBody');
     if (accounts.length === 0) {
-        tbody.innerHTML = emptyCell(4, 'i-key', '暂无账户数据', '点击「从学员列表同步」生成账户');
+        tbody.innerHTML = emptyCell(6, 'i-key', '暂无账户数据', '点击「从学员列表同步」生成账户');
         return;
     }
     tbody.innerHTML = accounts.map(a => {
@@ -1822,7 +2135,9 @@ function renderAccounts(accounts) {
         return `<tr>
             <td><strong>${escapeHtml(a.name) || '-'}</strong></td>
             <td class="num">${escapeHtml(a.phone)}</td>
-            <td><span class="tag ${a.role === 'admin' ? 'tag-approved' : 'tag-pending'}"><span class="tag-dot"></span>${a.role === 'admin' ? '管理员' : '学员'}</span></td>
+            <td>${escapeHtml(a.company) || '-'}</td>
+            <td>${escapeHtml(a.className) || '-'}</td>
+            <td>${escapeHtml(a.schedule) || '-'}</td>
             <td class="num">${escapeHtml(time)}</td>
         </tr>`;
     }).join('');
@@ -1835,12 +2150,49 @@ function syncAccounts() {
 }
 
 // ============ 管理员管理 ============
+let allAdmins = [];
+const roleMap = { superadmin: '超级管理员', admin: '管理员' };
+
 function loadAdmins() {
     const tbody = document.getElementById('adminTableBody');
     tbody.innerHTML = skeletonRows(6, 5);
     apiFetch(`${API_BASE}/admins`).then(r => r.json()).then(res => {
-        if (res.success) renderAdmins(res.data);
+        if (res.success) { allAdmins = res.data; loadClassFilterOptions('fAdmClass'); filterAdmins(); }
     }).catch(() => { tbody.innerHTML = emptyCell(6, 'i-alert', '加载失败'); });
+}
+
+function filterAdmins() {
+    const q = fv('fAdmName').toLowerCase();
+    const pin = acState.adm.phone;
+    const role = fv('fAdmRole');
+    const cls = fv('fAdmClass');
+    const active = !!(q || pin || role || cls);
+    const nameHit = a => pin
+        ? a.phone === pin
+        : (!q || (a.name || '').toLowerCase().includes(q) || (a.phone || '').toLowerCase().includes(q));
+    const list = allAdmins.filter(a =>
+        nameHit(a) &&
+        (!role || a.role === role) &&
+        (!cls || (a.classes || []).includes(cls))
+    );
+    setFilterCount('admFilterCount', list.length, allAdmins.length);
+    if (active && list.length === 0) {
+        document.getElementById('adminTableBody').innerHTML = emptyCell(6, 'i-search', '无匹配的管理员', '可减少条件，或点击「重置」恢复全部');
+        return;
+    }
+    renderAdmins(list);
+}
+
+function resetAdmFilterUI() {
+    clearFilter(['fAdmName', 'fAdmRole', 'fAdmClass']);
+    acState.adm.phone = '';
+    acClose('adm');
+    const c = document.getElementById('admFilterCount');
+    if (c) c.textContent = '';
+}
+function resetAdmFilter() {
+    resetAdmFilterUI();
+    filterAdmins();
 }
 
 function renderAdmins(admins) {
@@ -1849,7 +2201,6 @@ function renderAdmins(admins) {
         tbody.innerHTML = emptyCell(6, 'i-user', '暂无管理员');
         return;
     }
-    const roleMap = { superadmin: '超级管理员', admin: '管理员' };
     const isSuperAdmin = currentAdminRole === 'superadmin';
     const currentPhone = localStorage.getItem('adminLogin') ? JSON.parse(localStorage.getItem('adminLogin')).phone : '';
     rowStore.admins = {};
@@ -2137,10 +2488,12 @@ function deleteTip(id) {
     });
 }
 
-// ============ 管理员批量导入 ============
+// ============ 管理员批量导入（选中文件后需点「确认导入」才上传） ============
+let adminSelectedFile = null;
+
 function showAdminImportModal() {
     document.getElementById('adminImportResult').innerHTML = '';
-    document.getElementById('adminFileInput').value = '';
+    clearAdminSelectedFile();
     document.getElementById('adminImportModal').classList.add('show');
 }
 function closeAdminImportModal() { document.getElementById('adminImportModal').classList.remove('show'); }
@@ -2148,16 +2501,47 @@ function closeAdminImportModal() { document.getElementById('adminImportModal').c
 const adminUploadZone = document.getElementById('adminUploadZone');
 if (adminUploadZone) {
     adminUploadZone.addEventListener('click', () => document.getElementById('adminFileInput').click());
+    adminUploadZone.addEventListener('dragover', e => { e.preventDefault(); adminUploadZone.classList.add('dragover'); });
+    adminUploadZone.addEventListener('dragleave', () => adminUploadZone.classList.remove('dragover'));
+    adminUploadZone.addEventListener('drop', e => {
+        e.preventDefault();
+        adminUploadZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleAdminFileSelected(e.dataTransfer.files[0]);
+    });
 }
 
 function handleAdminFileSelect(e) {
-    if (!e.target.files.length) return;
-    const file = e.target.files[0];
+    if (e.target.files.length) handleAdminFileSelected(e.target.files[0]);
+}
+
+function handleAdminFileSelected(file) {
     if (!file.name.match(/\.xlsx?$/i)) return showToast('请选择 Excel 文件', 'error');
+    adminSelectedFile = file;
+    document.getElementById('adminSelectedFileName').textContent = file.name;
+    document.getElementById('adminSelectedFileSize').textContent = '(' + (file.size / 1024).toFixed(1) + ' KB)';
+    document.getElementById('adminSelectedFileBox').classList.remove('hidden');
+    document.getElementById('adminImportResult').innerHTML = '';
+}
+
+function clearAdminSelectedFile() {
+    adminSelectedFile = null;
+    document.getElementById('adminSelectedFileBox').classList.add('hidden');
+    document.getElementById('adminFileInput').value = '';
+}
+
+function confirmAdminImport() {
+    if (!adminSelectedFile) return showToast('请先选择文件', 'error');
+    const btn = document.getElementById('adminConfirmImportBtn');
+    btn.disabled = true;
+    btn.textContent = '导入中...';
+
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', adminSelectedFile);
     document.getElementById('adminImportResult').innerHTML = '<div class="result-box result-info"><span class="result-icon">' + ico('i-clock') + '</span><div>正在导入...</div></div>';
+
     apiFetch(`${API_BASE}/admins/import`, { method: 'POST', body: formData }).then(r => r.json()).then(res => {
+        btn.disabled = false;
+        btn.textContent = '确认导入';
         if (res.success) {
             const d = res.data;
             let html = `<div class="result-box result-success"><span class="result-icon">${ico('i-check-circle')}</span><div>导入完成：共 ${d.total} 条，成功 ${d.added} 条，失败 ${d.failed} 条</div></div>`;
@@ -2167,9 +2551,14 @@ function handleAdminFileSelect(e) {
             html += '<div class="result-box result-info" style="margin-top:8px;"><div>未填密码的账号：账号和密码都为手机号；创建时间已自动生成；对方首次登录时会要求修改密码。</div></div>';
             document.getElementById('adminImportResult').innerHTML = html;
             loadAdmins();
+            clearAdminSelectedFile();
         } else {
             document.getElementById('adminImportResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>${escapeHtml(res.message)}</div></div>`;
         }
+    }).catch(err => {
+        btn.disabled = false;
+        btn.textContent = '确认导入';
+        document.getElementById('adminImportResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>导入失败：${escapeHtml(err.message)}</div></div>`;
     });
 }
 </script>

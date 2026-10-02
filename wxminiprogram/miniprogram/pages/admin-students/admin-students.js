@@ -107,7 +107,7 @@ Page({
     const { id, name } = e.currentTarget.dataset;
     wx.showModal({
       title: '确认删除',
-      content: `确定要删除学员"${name}"吗？此操作不可恢复。`,
+      content: `确定要删除学员"${name}"吗？其登录账户将同步删除，此操作不可恢复。`,
       confirmColor: '#dc3545',
       success: (res) => {
         if (res.confirm) {

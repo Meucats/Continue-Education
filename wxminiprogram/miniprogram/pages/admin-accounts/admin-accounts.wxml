@@ -2,7 +2,7 @@
   <view class="page-title">账户管理</view>
 
   <view class="notice-card card">
-    <view class="notice-text">学员首次用手机号登录小程序时，系统会自动创建账户。密码默认为手机号后6位。</view>
+    <view class="notice-text">学员以手机号登录，初始密码为身份证后6位（无身份证则手机号后6位），首次登录须修改密码。</view>
   </view>
 
   <view class="search-box card">

@@ -155,9 +155,20 @@ const ph = arr => arr.map(x => x.phone).join(',');
     r = await req('POST', '/students', null, S); // 触发一次普通 GET 不校验也不炸
     r = await req('DELETE', '/students', null, S); // 批量删除路由若不存在应为404而非500
     ok('6b 存在学员写路径（详情可读）', true);
+    // 账户同步：先同步出夹具账户，删除学员后账户应级联消失（账户列表与学员列表一致）
+    r = await req('POST', '/accounts/sync', null, S);
+    ok('6b1 触发账户同步', r.json && r.json.success, JSON.stringify(r.json));
+    let accR = await req('GET', '/accounts', null, S);
+    ok('6b2 同步后账户含夹具手机号', accR.json && accR.json.success && (accR.json.data || []).some(x => x.phone === '13900000009'),
+      'total=' + (accR.json && accR.json.total));
     // 用云端 deleteStudent 清夹具
     ir = await invoke({ action: 'deleteStudent', secret: CFG.adminApiSecret, id: fxId });
     ok('6c 删夹具学员', ir && ir.success, JSON.stringify(ir));
+    accR = await req('GET', '/accounts', null, S);
+    ok('6c1 删除后账户同步删除', accR.json && accR.json.success && !(accR.json.data || []).some(x => x.phone === '13900000009'),
+      '残留=' + ((accR.json && accR.json.data || []).some(x => x.phone === '13900000009')));
+    r = await req('POST', '/accounts/sync', null, S);
+    ok('6c2 删除后再同步不复生', r.json && r.json.success, JSON.stringify(r.json));
   } else { ok('6 学员夹具定位', false, '未找到'); }
   // 普通管理员的写 action（addStudent/updateStudent 不受限）
   ir = await invoke({ action: 'addStudent', token: s1, data: { name: '管A建的学员', phone: '13900000008', className: CA, schedule: 't', location: 't', deadline: '2026-12-31', courseStartDate: '2026-10-01', courseEndDate: '2026-12-31' } });
