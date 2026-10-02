@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "check": "node scripts/check-html.js && node scripts/check-w2-refactor.js && node scripts/check-w3-server.js && node --check server.js && node --check ../../wxminiprogram/cloudfunctions/adminApi/index.js && node --check test/e2e-profile.js && node --check test/e2e-classmatrix.js && node --check test/e2e-concurrency.js && node scripts/check-excel-aliases.js",
+    "check": "node scripts/check-html.js && node scripts/check-w2-refactor.js && node scripts/check-w3-server.js && node --check server.js && node --check shared/import-tools.js && node --check ../../wxminiprogram/cloudfunctions/adminApi/index.js && node --check ../../wxminiprogram/cloudfunctions/adminApi/shared/import-tools.js && node --check test/e2e-profile.js && node --check test/e2e-classmatrix.js && node --check test/e2e-concurrency.js && node scripts/check-excel-aliases.js",
     "e2e": "node test/e2e-profile.js && node test/e2e-classmatrix.js && node test/e2e-concurrency.js",
     "e2e:profile": "node test/e2e-profile.js",
     "e2e:classmatrix": "node test/e2e-classmatrix.js",
