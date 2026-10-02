@@ -5,10 +5,11 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "check": "node scripts/check-html.js && node scripts/check-w2-refactor.js && node scripts/check-w3-server.js && node --check server.js && node --check ../../wxminiprogram/cloudfunctions/adminApi/index.js && node --check test/e2e-profile.js && node --check test/e2e-classmatrix.js && node scripts/check-excel-aliases.js",
-    "e2e": "node test/e2e-profile.js && node test/e2e-classmatrix.js",
+    "check": "node scripts/check-html.js && node scripts/check-w2-refactor.js && node scripts/check-w3-server.js && node --check server.js && node --check ../../wxminiprogram/cloudfunctions/adminApi/index.js && node --check test/e2e-profile.js && node --check test/e2e-classmatrix.js && node --check test/e2e-concurrency.js && node scripts/check-excel-aliases.js",
+    "e2e": "node test/e2e-profile.js && node test/e2e-classmatrix.js && node test/e2e-concurrency.js",
     "e2e:profile": "node test/e2e-profile.js",
-    "e2e:classmatrix": "node test/e2e-classmatrix.js"
+    "e2e:classmatrix": "node test/e2e-classmatrix.js",
+    "e2e:concurrency": "node test/e2e-concurrency.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
