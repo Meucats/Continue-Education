@@ -204,6 +204,20 @@ async function classNamesAggregate() {
 
 // 排课日期生成 generateCourseDates/Multi 已收敛至 shared/course-dates（R4 单源，文件头 require）
 
+// R12 收敛：getStudents/getRequests 的 conds→query 同构段统一（1 条直传、多条 and，行为等价）
+function applyConds(query, conds) {
+  if (conds.length === 1) return query.where(conds[0]);
+  if (conds.length > 1) return query.where(_.and(conds));
+  return query;
+}
+
+// R12 收敛：默认管理员文档构造（loginAdmin 首次部署引导与 initDefaultAdmin 共用；两处创建条件与返回消息语义不同，各自保留）
+async function createDefaultAdminDoc() {
+  await db.collection('admins').add({
+    data: { name: '系统管理员', phone: 'admin', password: hashPassword('admin123'), role: 'superadmin', mustChangePassword: true, createdAt: new Date() }
+  });
+}
+
 exports.main = async (event, context) => {
   const { action, data, id, status, reason, keyword, token, secret } = event;
 
@@ -237,9 +251,10 @@ exports.main = async (event, context) => {
     }
   }
 
-  switch (action) {
+  const HANDLERS = {
     // ====== 学员管理 ======
-    case 'getStudents': {
+    getStudents: async (ctx) => {
+      const { event, data, keyword, session } = ctx;
       const actor = getActor(event, session);
       const conds = [];
       if (classFiltered(actor)) conds.push({ className: _.in(actor.classes) });
@@ -251,23 +266,23 @@ exports.main = async (event, context) => {
           { className: reg }
         ]));
       }
-      let query = db.collection('students');
-      if (conds.length === 1) query = query.where(conds[0]);
-      else if (conds.length > 1) query = query.where(_.and(conds));
+      const query = applyConds(db.collection('students'), conds);
       const count = await query.count();
       const limit = Math.min(count.total, 1000);
       const result = await query.orderBy('createdAt', 'desc').limit(limit).get();
       return { success: true, data: result.data.map(stripSecrets), total: count.total, truncated: result.data.length < count.total };
-    }
+    },
 
-    case 'getStudent': {
+    getStudent: async (ctx) => {
+      const { data, id } = ctx;
       if (!id) return { success: false, message: '缺少学员ID' };
       const stu = await db.collection('students').doc(id).get().catch(() => null);
       if (!stu || !stu.data) return { success: false, message: '学员不存在' };
       return { success: true, data: stripSecrets(stu.data) };
-    }
+    },
 
-    case 'addStudent': {
+    addStudent: async (ctx) => {
+      const { data, id } = ctx;
       const { name, phone, className, schedule, deadline, location, courseDates, courseStartDate, courseEndDate, idCard, company } = data;
       if (!name || !phone || !className || !schedule || !location) {
         return { success: false, message: '请填写所有必填字段' };
@@ -289,9 +304,10 @@ exports.main = async (event, context) => {
         data: { name, phone, className, schedule, deadline: deadline || '', location, courseDates: calcDates, courseStartDate: courseStartDate || '', courseEndDate: courseEndDate || '', idCard: idCard || '', company: company || '', password: hashPassword(initPassword), mustChangePassword: true, createdAt: new Date() }
       });
       return { success: true, message: '学员添加成功', id: res._id, initPassword };
-    }
+    },
 
-    case 'updateStudent': {
+    updateStudent: async (ctx) => {
+      const { data } = ctx;
       const { _id, name, phone, className, schedule, deadline, location, courseDates, courseStartDate, courseEndDate, idCard, company } = data;
       if (!_id) return { success: false, message: '缺少学员ID' };
       // 落库前统一按 schedule+课程起止日期重算（多时段）；三要素不全时才用客户端传值兜底
@@ -303,9 +319,10 @@ exports.main = async (event, context) => {
       if (company !== undefined) updateData.company = company;
       await db.collection('students').doc(_id).update({ data: updateData });
       return { success: true, message: '学员信息已更新' };
-    }
+    },
 
-    case 'deleteStudent': {
+    deleteStudent: async (ctx) => {
+      const { data, id } = ctx;
       if (!id) return { success: false, message: '缺少学员ID' };
       let stuPhone = '';
       try {
@@ -319,9 +336,10 @@ exports.main = async (event, context) => {
         await revokeSessions(stuPhone, 'student');
       }
       return { success: true, message: '删除成功' };
-    }
+    },
 
-    case 'batchDeleteStudents': {
+    batchDeleteStudents: async (ctx) => {
+      const { data, id } = ctx;
       const { ids } = data;
       if (!ids || ids.length === 0) return { success: false, message: '请选择要删除的学员' };
       // 先取手机号：删完学员后需联动删账户/吊销会话
@@ -359,10 +377,11 @@ exports.main = async (event, context) => {
         }
       }
       return { success: true, message: `成功删除 ${ids.length} 名学员` };
-    }
+    },
 
     // ====== 密码管理 ======
-    case 'resetPassword': {
+    resetPassword: async (ctx) => {
+      const { data, id } = ctx;
       const stuId = id;
       if (!stuId) return { success: false, message: '缺少学员ID' };
       const stu = await db.collection('students').doc(stuId).get();
@@ -375,9 +394,10 @@ exports.main = async (event, context) => {
       });
       await revokeSessions(phone, 'student');
       return { success: true, message: '密码已重置', newPassword: newPwd };
-    }
+    },
 
-    case 'changePassword': {
+    changePassword: async (ctx) => {
+      const { event, data } = ctx;
       const stuPhone = (data && data.phone) || event.phone;
       const oldPassword = (data && data.oldPassword) || event.oldPassword;
       const newPassword = (data && data.newPassword) || event.newPassword;
@@ -398,9 +418,10 @@ exports.main = async (event, context) => {
       });
       await revokeSessions(stuPhone, 'student');
       return { success: true, message: '密码修改成功' };
-    }
+    },
 
-    case 'changeAdminPassword': {
+    changeAdminPassword: async (ctx) => {
+      const { data, session } = ctx;
       // 会话内改密用会话身份；登录前改密必须提供 phone+原密码（有限速）
       const aPhone = session ? session.phone : (data && data.phone);
       const oldPassword = data && data.oldPassword;
@@ -422,10 +443,11 @@ exports.main = async (event, context) => {
       });
       await revokeSessions(aPhone, 'admin');
       return { success: true, message: '密码修改成功' };
-    }
+    },
 
     // ====== 登录 ======
-    case 'loginAdmin': {
+    loginAdmin: async (ctx) => {
+      const { data, token } = ctx;
       const { phone: aPhone, password: aPwd } = data || {};
       if (!aPhone || !aPwd) return { success: false, message: '请输入账号和密码' };
       const limiterKey = 'admin:' + aPhone;
@@ -435,9 +457,7 @@ exports.main = async (event, context) => {
       if (adminRes.data.length === 0) {
         const cnt = await db.collection('admins').count();
         if (cnt.total === 0 && aPhone === 'admin' && aPwd === 'admin123') {
-          await db.collection('admins').add({
-            data: { name: '系统管理员', phone: 'admin', password: hashPassword('admin123'), role: 'superadmin', mustChangePassword: true, createdAt: new Date() }
-          });
+          await createDefaultAdminDoc();
           adminRes = await db.collection('admins').where({ phone: aPhone }).limit(1).get();
         }
       }
@@ -458,9 +478,10 @@ exports.main = async (event, context) => {
         success: true,
         data: { _id: admin._id, name: admin.name, phone: admin.phone, role, classes: admin.classes || [], mustChangePassword: mustChange, token: t }
       };
-    }
+    },
 
-    case 'loginStudent': {
+    loginStudent: async (ctx) => {
+      const { data, token } = ctx;
       const { phone: sPhone, password: sPwd } = data || {};
       if (!sPhone || !sPwd) return { success: false, message: '请输入账号和密码' };
       const limiterKey = 'stu:' + sPhone;
@@ -485,16 +506,18 @@ exports.main = async (event, context) => {
       const safe = stripSecrets(stu);
       delete safe.mustChangePassword;
       return { success: true, data: { ...safe, mustChangePassword: !!stu.mustChangePassword, token: t } };
-    }
+    },
 
-    case 'getStudentSelf': {
+    getStudentSelf: async (ctx) => {
+      const { data, session } = ctx;
       if (!session || !session.phone) return { success: false, code: 'UNAUTHORIZED', message: '未登录' };
       const stuRes = await db.collection('students').where({ phone: session.phone }).limit(1).get();
       if (stuRes.data.length === 0) return { success: false, message: '学员不存在' };
       return { success: true, data: stripSecrets(stuRes.data[0]) };
-    }
+    },
 
-    case 'getMyRequests': {
+    getMyRequests: async (ctx) => {
+      const { data, session } = ctx;
       if (!session || !session.phone) return { success: false, code: 'UNAUTHORIZED', message: '未登录' };
       const result = await db.collection('entry_requests')
         .where({ phone: session.phone })
@@ -502,14 +525,16 @@ exports.main = async (event, context) => {
         .limit(data && data.limit ? data.limit : 50)
         .get();
       return { success: true, data: result.data.map(r => ({ ...r, isExpired: isRequestExpired(r) })) };
-    }
+    },
 
-    case 'logout': {
+    logout: async (ctx) => {
+      const { session } = ctx;
       if (session) await db.collection('sessions').doc(session._id).remove().catch(() => {});
       return { success: true, message: '已退出登录' };
-    }
+    },
 
-    case 'upsertMyUser': {
+    upsertMyUser: async (ctx) => {
+      const { data, session } = ctx;
       if (!session || !session.phone) return { success: false, code: 'UNAUTHORIZED', message: '未登录' };
       const uRes = await db.collection('users').where({ phone: session.phone }).limit(1).get();
       if (uRes.data.length > 0) {
@@ -522,10 +547,11 @@ exports.main = async (event, context) => {
       });
       const created = await db.collection('users').doc(addRes._id).get();
       return { success: true, data: stripSecrets(created.data) };
-    }
+    },
 
     // ====== 入校申请 ======
-    case 'getRequests': {
+    getRequests: async (ctx) => {
+      const { event, data, status, session } = ctx;
       const actor = getActor(event, session);
       const conds = [];
       if (status && status !== 'all') conds.push({ status });
@@ -536,15 +562,14 @@ exports.main = async (event, context) => {
         if (phones.length === 0) return { success: true, data: [] };
         conds.push({ phone: _.in(phones) });
       }
-      let query = db.collection('entry_requests');
-      if (conds.length === 1) query = query.where(conds[0]);
-      else if (conds.length > 1) query = query.where(_.and(conds));
+      const query = applyConds(db.collection('entry_requests'), conds);
       const count = await query.count();
       const result = await query.orderBy('createdAt', 'desc').limit(200).get();
       return { success: true, data: result.data.map(r => ({ ...r, isExpired: isRequestExpired(r) })), total: count.total, truncated: result.data.length < count.total };
-    }
+    },
 
-    case 'addRequest': {
+    addRequest: async (ctx) => {
+      const { data, status } = ctx;
       const { name, phone, carPlate, entryDate, entryStartTime, entryEndTime } = data;
       if (!name || !phone) return { success: false, message: '请填写姓名和电话' };
       if (!entryDate || !entryStartTime || !entryEndTime) return { success: false, message: '请选择进校日期和时间段' };
@@ -558,27 +583,30 @@ exports.main = async (event, context) => {
         }
       });
       return { success: true, message: '申请已提交' };
-    }
+    },
 
-    case 'approveRequest': {
+    approveRequest: async (ctx) => {
+      const { data, id, status } = ctx;
       if (!id) return { success: false, message: '缺少申请ID' };
       await db.collection('entry_requests').doc(id).update({
         data: { status: 'approved', processedAt: new Date() }
       });
       return { success: true, message: '已通过' };
-    }
+    },
 
-    case 'rejectRequest': {
+    rejectRequest: async (ctx) => {
+      const { data, id, status, reason } = ctx;
       if (!id) return { success: false, message: '缺少申请ID' };
       await db.collection('entry_requests').doc(id).update({
         data: { status: 'rejected', rejectReason: reason || '', processedAt: new Date() }
       });
       return { success: true, message: '已拒绝' };
-    }
+    },
 
     // ====== 账户管理 ======
     // 账户列表：拼学员资料补齐公司/班级/上课时间（不带身份证等敏感字段）；只列仍有学员对应的账户；受限管理员只看本班账户（与 getStudents 班级隔离一致）
-    case 'getAccounts': {
+    getAccounts: async (ctx) => {
+      const { event, session } = ctx;
       const actor = getActor(event, session);
       const filtered = classFiltered(actor);
       const count = await db.collection('users').count();
@@ -613,9 +641,10 @@ exports.main = async (event, context) => {
       const fetchTruncated = result.data.length < count.total;
       const total = filtered ? data.length : (fetchTruncated ? count.total : data.length);
       return { success: true, data, total, truncated: filtered ? data.length >= 1000 : fetchTruncated };
-    }
+    },
 
-    case 'syncAccounts': {
+    syncAccounts: async (ctx) => {
+      const { data } = ctx;
       const stuCount = await db.collection('students').count();
       const studentsRes = await db.collection('students').limit(1000).get();
       const accountsRes = await db.collection('users').limit(1000).get();
@@ -645,10 +674,11 @@ exports.main = async (event, context) => {
         }
       }
       return { success: true, message: `同步了 ${count} 个新账户${removed ? `，清理了 ${removed} 个已删除学员的账户` : ''}` };
-    }
+    },
 
     // ====== 统计 ======
-    case 'getStats': {
+    getStats: async (ctx) => {
+      const { event, data, status, session } = ctx;
       const actor = getActor(event, session);
       const filtered = classFiltered(actor);
       const today = new Date().toISOString().slice(0, 10);
@@ -710,10 +740,11 @@ exports.main = async (event, context) => {
           classNames
         }
       };
-    }
+    },
 
     // ====== 批量导入 ======
-    case 'importStudents': {
+    importStudents: async (ctx) => {
+      const { event, data } = ctx;
       const { fileID } = event;
       if (!fileID) return { success: false, message: '缺少文件ID' };
 
@@ -779,15 +810,17 @@ exports.main = async (event, context) => {
       }
 
       return { success: true, total: jsonData.length, added, updated, failed, errors };
-    }
+    },
 
     // ====== 管理员管理 ======
-    case 'getAdmins': {
+    getAdmins: async (ctx) => {
+      const { data } = ctx;
       const result = await db.collection('admins').orderBy('createdAt', 'desc').get();
       return { success: true, data: result.data.map(stripSecrets) };
-    }
+    },
 
-    case 'addAdmin': {
+    addAdmin: async (ctx) => {
+      const { data } = ctx;
       const { name: aName, phone: aPhone2, password: aPwd2, role, classes: aClasses } = data || {};
       if (!aName || !aPhone2) return { success: false, message: '请填写姓名和账号' };
       const exists = await db.collection('admins').where({ phone: aPhone2 }).get();
@@ -797,9 +830,10 @@ exports.main = async (event, context) => {
         data: { name: aName, phone: aPhone2, password: hashPassword(String(aPwd2 || '').trim() || aPhone2), role: role || 'admin', classes: aClasses || [], mustChangePassword: true, createdAt: new Date() }
       });
       return { success: true, message: '添加成功' };
-    }
+    },
 
-    case 'updateAdmin': {
+    updateAdmin: async (ctx) => {
+      const { data } = ctx;
       const { _id, name: uName, phone: uPhone, password: uPwd, role: uRole, classes: uClasses } = data || {};
       if (!_id) return { success: false, message: '缺少管理员ID' };
       let oldDoc = null;
@@ -825,9 +859,10 @@ exports.main = async (event, context) => {
         if (uPwd && phoneChanged && uPhone) await revokeSessions(uPhone, 'admin');
       }
       return { success: true, message: '更新成功' };
-    }
+    },
 
-    case 'deleteAdmin': {
+    deleteAdmin: async (ctx) => {
+      const { data, id } = ctx;
       if (!id) return { success: false, message: '缺少管理员ID' };
       const adminDoc = await db.collection('admins').doc(id).get();
       if (adminDoc.data && adminDoc.data.phone === 'admin') {
@@ -836,9 +871,10 @@ exports.main = async (event, context) => {
       if (adminDoc.data) await revokeSessions(adminDoc.data.phone, 'admin');
       await db.collection('admins').doc(id).remove();
       return { success: true, message: '删除成功' };
-    }
+    },
 
-    case 'resetAdminPassword': {
+    resetAdminPassword: async (ctx) => {
+      const { data, id } = ctx;
       const tId = (data && data.id) || id;
       const tPhone = data && data.phone;
       let target = null;
@@ -860,21 +896,21 @@ exports.main = async (event, context) => {
       });
       await revokeSessions(target.phone, 'admin');
       return { success: true, message: '密码已重置', newPassword: newPwd };
-    }
+    },
 
-    case 'initDefaultAdmin': {
+    initDefaultAdmin: async (ctx) => {
+      const { data } = ctx;
       const existing = await db.collection('admins').where({ phone: 'admin' }).get();
       if (existing.data.length === 0) {
-        await db.collection('admins').add({
-          data: { name: '系统管理员', phone: 'admin', password: hashPassword('admin123'), role: 'superadmin', mustChangePassword: true, createdAt: new Date() }
-        });
+        await createDefaultAdminDoc();
         return { success: true, message: '默认管理员已创建（admin/admin123，首次登录需修改密码）' };
       }
       return { success: true, message: '默认管理员已存在' };
-    }
+    },
 
     // ====== 温馨提示 ======
-    case 'getTips': {
+    getTips: async (ctx) => {
+      const { data } = ctx;
       const { className: tipClass } = data || {};
       if (!tipClass) return { success: true, data: { className: '默认', content: '欢迎来到杭州职业技术大学继续教育学院！请遵守校园管理规定，按时到校上课。如有疑问请联系：56700015。' } };
       const tipRes = await db.collection('tips').where({ className: tipClass }).limit(1).get();
@@ -882,14 +918,16 @@ exports.main = async (event, context) => {
         return { success: true, data: tipRes.data[0] };
       }
       return { success: true, data: { className: tipClass, content: '欢迎来到杭州职业技术大学继续教育学院！请遵守校园管理规定，按时到校上课。如有疑问请联系：56700015。' } };
-    }
+    },
 
-    case 'getAllTips': {
+    getAllTips: async (ctx) => {
+      const { data } = ctx;
       const allTipRes = await db.collection('tips').orderBy('className', 'asc').limit(100).get();
       return { success: true, data: allTipRes.data };
-    }
+    },
 
-    case 'updateTip': {
+    updateTip: async (ctx) => {
+      const { data, session } = ctx;
       const { className: tipClass2, content: tipContent } = data || {};
       if (!tipClass2) return { success: false, message: '请选择班级' };
       const existingTip = await db.collection('tips').where({ className: tipClass2 }).get();
@@ -903,25 +941,28 @@ exports.main = async (event, context) => {
         });
       }
       return { success: true, message: '保存成功' };
-    }
+    },
 
-    case 'deleteTip': {
+    deleteTip: async (ctx) => {
+      const { data, id } = ctx;
       const { id: tipId } = data || {};
       if (!tipId) return { success: false, message: '缺少提示ID' };
       await db.collection('tips').doc(tipId).remove();
       return { success: true, message: '删除成功' };
-    }
+    },
 
-    case 'getClasses': {
+    getClasses: async (ctx) => {
+      const { event, data, session } = ctx;
       const actor = getActor(event, session);
       let query = db.collection('students');
       if (classFiltered(actor)) query = query.where({ className: _.in(actor.classes) });
       const stuRes = await query.limit(1000).get();
       const cls = [...new Set(stuRes.data.map(s => s.className).filter(Boolean))];
       return { success: true, data: cls };
-    }
+    },
 
-    case 'importAdmins': {
+    importAdmins: async (ctx) => {
+      const { data } = ctx;
       const { admins: adminList } = data || {};
       if (!adminList || adminList.length === 0) return { success: false, message: '没有数据' };
       let addedA = 0, failedA = 0;
@@ -953,10 +994,11 @@ exports.main = async (event, context) => {
         }
       }
       return { success: true, data: { total: adminList.length, added: addedA, failed: failedA, errors: errorsA } };
-    }
+    },
 
     // ====== 一次性数据修复：按 schedule+课程起止日期重算 courseDates（修复历史单时段落库问题；幂等可重复执行）======
-    case 'repairCourseDates': {
+    repairCourseDates: async (ctx) => {
+      const { data } = ctx;
       let total = 0, fixed = 0, skipped = 0, courses = 0;
       let skip = 0;
       for (;;) {
@@ -977,10 +1019,11 @@ exports.main = async (event, context) => {
         skip += r.data.length;
       }
       return { success: true, message: `共 ${total} 名学员，修正 ${fixed} 名，跳过 ${skipped} 名`, data: { total, fixed, skipped, courses } };
-    }
+    },
 
     // ====== 一次性迁移导出（保留至迁移完全完成、云退役确认后再删除）======
-    case 'exportAll': {
+    exportAll: async (ctx) => {
+      const { data } = ctx;
       async function dumpAll(coll) {
         const all = [];
         let skip = 0;
@@ -998,9 +1041,9 @@ exports.main = async (event, context) => {
       }
       out._exportedAt = new Date();
       return { success: true, data: out };
-    }
-
-    default:
-      return { success: false, message: '未知操作: ' + action };
-  }
+    },
+  };
+  const handler = HANDLERS[action];
+  if (!handler) return { success: false, message: '未知操作: ' + action };
+  return handler({ event, data, id, status, reason, keyword, token, secret, session, secretOk });
 };
