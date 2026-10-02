@@ -25,7 +25,7 @@ Page({
       this.loadRequestInfo(userInfo.phone);
     } else {
       this.setData({ courses: [], hasCourse: false, requestInfo: null, isRequestExpired: false, isWarm: false });
-      wx.setNavigationBarColor({ frontColor: '#ffffff', backgroundColor: '#1558C7', animation: { duration: 300, timingFunc: 'easeIn' } });
+      util.setWarmNavColor(false);
     }
   },
 
@@ -42,19 +42,13 @@ Page({
     sunday.setDate(monday.getDate() + 6);
     sunday.setHours(23, 59, 59, 999);
 
-    const formatDate = (d) => {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
-    };
-    const mondayStr = formatDate(monday);
-    const sundayStr = formatDate(sunday);
+    const mondayStr = util.formatDate(monday);
+    const sundayStr = util.formatDate(sunday);
 
     callUserApi('getStudentSelf').then(res => {
       const list = res && res.success && res.data ? [res.data] : [];
       const courseCards = [];
-      const todayStr = formatDate(new Date());
+      const todayStr = util.formatDate(new Date());
       list.forEach(item => {
         const expired = util.isCourseExpired(item.deadline, item.courseEndDate);
         if (item.courseDates && item.courseDates.length > 0) {
@@ -106,11 +100,7 @@ Page({
       } else {
         this.setData({ requestInfo: null, isRequestExpired: false, isWarm: false });
       }
-      wx.setNavigationBarColor({
-        frontColor: '#ffffff',
-        backgroundColor: isWarm ? '#C2410C' : '#1558C7',
-        animation: { duration: 300, timingFunc: 'easeIn' }
-      });
+      util.setWarmNavColor(isWarm);
     }).catch(err => {
       console.error('加载申请信息失败', err);
     });

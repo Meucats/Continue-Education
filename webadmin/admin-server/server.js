@@ -718,6 +718,7 @@ app.get('/api/stats/detail', async (req, res) => {
 });
 
 // ====== 导出/下载 ======
+// 10列正式Excel导出；3列CSV快速复制在小程序 admin-accounts.onExport（互链，两处口径不同勿合并）
 app.get('/api/export/students', async (req, res) => {
   try {
     const result = await callCloudFunction('getStudents', { actorRole: req.admin.role, actorClasses: req.admin.classes || [] });

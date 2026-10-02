@@ -1,19 +1,18 @@
-const formatTime = date => {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const hour = date.getHours();
-  const minute = date.getMinutes();
-  const second = date.getSeconds();
-
-  return `${[year, month, day].map(formatNumber).join('/')} ${[hour, minute, second].map(formatNumber).join(':')}`;
+const formatDate = date => {
+  if (!date) return '';
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  return `${year}-${formatNumber(month)}-${formatNumber(day)}`;
 };
 
-const formatDate = date => {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  return `${year}-${formatNumber(month)}-${formatNumber(day)}`;
+const formatDateTime = date => {
+  if (!date) return '';
+  const d = new Date(date);
+  const hour = d.getHours();
+  const minute = d.getMinutes();
+  return `${formatDate(d)} ${formatNumber(hour)}:${formatNumber(minute)}`;
 };
 
 const formatNumber = n => {
@@ -40,10 +39,29 @@ const hasActiveCourse = (students) => {
 const isRequestExpired = req => !!(req && req.status === 'approved' &&
   (!req.entryDate || new Date() > new Date((req.entryDate + ' ' + (req.entryEndTime || '23:59')).replace(/-/g, '/'))));
 
+const ensureAdmin = () => {
+  const app = getApp();
+  if (!app.globalData.isAdmin) {
+    wx.reLaunch({ url: '/pages/admin/admin' });
+    return false;
+  }
+  return true;
+};
+
+const setWarmNavColor = isWarm => {
+  wx.setNavigationBarColor({
+    frontColor: '#ffffff',
+    backgroundColor: isWarm ? '#C2410C' : '#1558C7',
+    animation: { duration: 300, timingFunc: 'easeIn' }
+  });
+};
+
 module.exports = {
-  formatTime,
   formatDate,
+  formatDateTime,
   isCourseExpired,
   hasActiveCourse,
-  isRequestExpired
+  isRequestExpired,
+  ensureAdmin,
+  setWarmNavColor
 };

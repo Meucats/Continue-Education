@@ -15,12 +15,8 @@ Page({
     pwdStrengthLabel: ''
   },
 
-  onPhoneInput: function (e) {
-    this.setData({ phone: e.detail.value });
-  },
-
-  onPasswordInput: function (e) {
-    this.setData({ password: e.detail.value });
+  onInput: function (e) {
+    this.setData({ [e.currentTarget.dataset.field]: e.detail.value });
   },
 
   onLogin: function () {
@@ -128,10 +124,6 @@ Page({
   },
 
   // 修改密码
-  onOldPwdInput: function (e) {
-    this.setData({ changeOldPwd: e.detail.value });
-  },
-
   onNewPwdInput: function (e) {
     const val = e.detail.value;
     let strength = '';
@@ -148,10 +140,6 @@ Page({
       else { strength = 'strong'; label = '强'; }
     }
     this.setData({ changeNewPwd: val, pwdStrength: strength, pwdStrengthLabel: label });
-  },
-
-  onConfirmPwdInput: function (e) {
-    this.setData({ changeConfirmPwd: e.detail.value });
   },
 
   onSubmitPassword: function () {

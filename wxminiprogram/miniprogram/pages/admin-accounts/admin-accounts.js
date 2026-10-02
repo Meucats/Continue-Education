@@ -1,13 +1,5 @@
+const util = require('../../utils/util.js');
 const { callAdminApi } = require('../../utils/api.js');
-const app = getApp();
-
-function ensureAdmin() {
-  if (!app.globalData.isAdmin) {
-    wx.reLaunch({ url: '/pages/admin/admin' });
-    return false;
-  }
-  return true;
-}
 
 Page({
   data: {
@@ -17,7 +9,7 @@ Page({
   },
 
   onShow: function () {
-    if (!ensureAdmin()) return;
+    if (!util.ensureAdmin()) return;
     this.loadAccounts();
   },
 
@@ -27,7 +19,7 @@ Page({
       wx.hideLoading();
       const accounts = (res.data || []).map(item => ({
         ...item,
-        createdAtText: this.formatDate(item.createdAt)
+        createdAtText: util.formatDate(item.createdAt)
       }));
       this.setData({
         accounts: accounts,
@@ -38,15 +30,6 @@ Page({
       wx.showToast({ title: '加载失败', icon: 'none' });
       console.error(err);
     });
-  },
-
-  formatDate: function (date) {
-    if (!date) return '';
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
   },
 
   onSearchInput: function (e) {
@@ -76,10 +59,15 @@ Page({
       return;
     }
 
+    // 3列CSV快速复制（姓名,手机,角色）；10列正式Excel导出在Web端 /api/export/students（server.js 同名路由处有互链注释）
     // 生成导出文本（密码为哈希值，不再导出明文）
+    const csvCell = v => {
+      const s = v == null ? '' : String(v);
+      return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
     let text = '姓名,手机号,角色\n';
     accounts.forEach(item => {
-      text += `${item.name},${item.phone},${item.role === 'admin' ? '管理员' : '学员'}\n`;
+      text += `${csvCell(item.name)},${csvCell(item.phone)},${csvCell(item.role === 'admin' ? '管理员' : '学员')}\n`;
     });
 
     // 复制到剪贴板

@@ -29,12 +29,8 @@ Page({
     }
   },
 
-  onAdminPhoneInput: function (e) {
-    this.setData({ adminPhone: e.detail.value });
-  },
-
-  onAdminPasswordInput: function (e) {
-    this.setData({ adminPassword: e.detail.value });
+  onInput: function (e) {
+    this.setData({ [e.currentTarget.dataset.field]: e.detail.value });
   },
 
   onAdminLogin: function () {

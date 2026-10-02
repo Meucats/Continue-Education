@@ -4,22 +4,22 @@
   <view class="form-card card m-enter">
     <view class="input-group">
       <view class="input-label">姓名 <text class="required">*</text></view>
-      <input class="input-field" placeholder="请输入您的姓名" placeholder-class="ph" value="{{name}}" bindinput="onNameInput" />
+      <input class="input-field" placeholder="请输入您的姓名" placeholder-class="ph" value="{{name}}" bindinput="onInput" data-field="name" />
     </view>
 
     <view class="input-group">
       <view class="input-label">联系电话 <text class="required">*</text></view>
-      <input class="input-field" type="number" maxlength="11" placeholder="请输入手机号码" placeholder-class="ph" value="{{phone}}" bindinput="onPhoneInput" />
+      <input class="input-field" type="number" maxlength="11" placeholder="请输入手机号码" placeholder-class="ph" value="{{phone}}" bindinput="onInput" data-field="phone" />
     </view>
 
     <view class="input-group">
       <view class="input-label">车牌号 <text class="optional">（选填）</text></view>
-      <input class="input-field" placeholder="请输入车牌号（如开车来校）" placeholder-class="ph" value="{{carPlate}}" bindinput="onCarPlateInput" />
+      <input class="input-field" placeholder="请输入车牌号（如开车来校）" placeholder-class="ph" value="{{carPlate}}" bindinput="onInput" data-field="carPlate" />
     </view>
 
     <view class="input-group">
       <view class="input-label">进校日期 <text class="required">*</text></view>
-      <picker mode="date" value="{{entryDate}}" bindchange="onDateChange" start="{{entryDate}}">
+      <picker mode="date" value="{{entryDate}}" bindchange="onInput" data-field="entryDate" start="{{entryDate}}">
         <view class="input-field picker-field">
           <text class="{{entryDate ? 'pv-on' : 'pv-off'}}">{{entryDate || '请选择进校日期'}}</text>
           <view class="picker-arrow ic ic-g-cal"></view>
@@ -30,7 +30,7 @@
     <view class="time-row">
       <view class="input-group time-group">
         <view class="input-label">开始时间 <text class="required">*</text></view>
-        <picker mode="time" value="{{entryStartTime}}" bindchange="onStartTimeChange">
+        <picker mode="time" value="{{entryStartTime}}" bindchange="onInput" data-field="entryStartTime">
           <view class="input-field picker-field">
             <text class="{{entryStartTime ? 'pv-on' : 'pv-off'}}">{{entryStartTime || '开始'}}</text>
             <view class="picker-arrow ic ic-g-clock"></view>
@@ -40,7 +40,7 @@
       <view class="time-separator">至</view>
       <view class="input-group time-group">
         <view class="input-label">结束时间 <text class="required">*</text></view>
-        <picker mode="time" value="{{entryEndTime}}" bindchange="onEndTimeChange">
+        <picker mode="time" value="{{entryEndTime}}" bindchange="onInput" data-field="entryEndTime">
           <view class="input-field picker-field">
             <text class="{{entryEndTime ? 'pv-on' : 'pv-off'}}">{{entryEndTime || '结束'}}</text>
             <view class="picker-arrow ic ic-g-clock"></view>

@@ -9,12 +9,12 @@
     <view class="login-form card m-enter m-enter-d2">
       <view class="input-group">
         <view class="input-label">管理员账号</view>
-        <input class="input-field" placeholder="请输入管理员账号" placeholder-class="ph" value="{{adminPhone}}" bindinput="onAdminPhoneInput" />
+        <input class="input-field" placeholder="请输入管理员账号" placeholder-class="ph" value="{{adminPhone}}" bindinput="onInput" data-field="adminPhone" />
       </view>
 
       <view class="input-group">
         <view class="input-label">密码</view>
-        <input class="input-field" password placeholder="请输入密码" placeholder-class="ph" value="{{adminPassword}}" bindinput="onAdminPasswordInput" />
+        <input class="input-field" password placeholder="请输入密码" placeholder-class="ph" value="{{adminPassword}}" bindinput="onInput" data-field="adminPassword" />
       </view>
 
       <button class="btn-primary login-btn" bindtap="onAdminLogin">登录</button>

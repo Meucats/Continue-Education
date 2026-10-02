@@ -1,4 +1,6 @@
 // 统一云函数调用：自动携带会话 token
+const util = require('./util.js');
+
 function getToken(type) {
   try {
     const key = type === 'admin' ? 'adminSession' : 'userSession';
@@ -41,4 +43,15 @@ function callUserApi(action, data, extra) {
   });
 }
 
-module.exports = { callAdminApi, callUserApi, getToken };
+function fetchRequestWarm() {
+  return callUserApi('getMyRequests', { limit: 1 }).then(res => {
+    const list = (res && res.success && res.data) ? res.data : [];
+    if (list.length > 0) {
+      const req = list[0];
+      return req.status === 'approved' && !util.isRequestExpired(req);
+    }
+    return false;
+  });
+}
+
+module.exports = { callAdminApi, callUserApi, getToken, fetchRequestWarm };

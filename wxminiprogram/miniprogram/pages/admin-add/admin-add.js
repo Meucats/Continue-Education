@@ -1,13 +1,5 @@
 const { callAdminApi } = require('../../utils/api.js');
-const app = getApp();
-
-function ensureAdmin() {
-  if (!app.globalData.isAdmin) {
-    wx.reLaunch({ url: '/pages/admin/admin' });
-    return false;
-  }
-  return true;
-}
+const util = require('../../utils/util.js');
 
 Page({
   data: {
@@ -31,7 +23,7 @@ Page({
   },
 
   onLoad: function (options) {
-    if (!ensureAdmin()) return;
+    if (!util.ensureAdmin()) return;
     if (options.id) {
       this.setData({ isEdit: true, editId: options.id });
       this.loadStudentData(options.id);

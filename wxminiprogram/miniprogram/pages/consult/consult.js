@@ -27,28 +27,8 @@ Page({
     }
   },
 
-  onNameInput: function (e) {
-    this.setData({ name: e.detail.value });
-  },
-
-  onPhoneInput: function (e) {
-    this.setData({ phone: e.detail.value });
-  },
-
-  onCarPlateInput: function (e) {
-    this.setData({ carPlate: e.detail.value });
-  },
-
-  onDateChange: function (e) {
-    this.setData({ entryDate: e.detail.value });
-  },
-
-  onStartTimeChange: function (e) {
-    this.setData({ entryStartTime: e.detail.value });
-  },
-
-  onEndTimeChange: function (e) {
-    this.setData({ entryEndTime: e.detail.value });
+  onInput: function (e) {
+    this.setData({ [e.currentTarget.dataset.field]: e.detail.value });
   },
 
   fetchMyRequests: function () {

@@ -1,6 +1,6 @@
 const app = getApp();
 const util = require('../../utils/util.js');
-const { callUserApi } = require('../../utils/api.js');
+const { callUserApi, fetchRequestWarm } = require('../../utils/api.js');
 
 Page({
   data: {
@@ -23,7 +23,7 @@ Page({
     this.setData({
       currentYear: today.getFullYear(),
       currentMonth: today.getMonth() + 1,
-      selectedDate: this.formatDateStr(today)
+      selectedDate: util.formatDate(today)
     });
   },
 
@@ -36,35 +36,17 @@ Page({
       this.loadWarmStatus(userInfo.phone);
     } else {
       this.setData({ allCourses: [], weekCourses: [], courseDatesSet: [], isWarm: false });
-      wx.setNavigationBarColor({ frontColor: '#ffffff', backgroundColor: '#1558C7', animation: { duration: 300, timingFunc: 'easeIn' } });
+      util.setWarmNavColor(false);
       this.buildCalendar();
       this.updateWeekRange();
     }
   },
 
   loadWarmStatus: function (phone) {
-    callUserApi('getMyRequests', { limit: 1 }).then(res => {
-      let isWarm = false;
-      const list = (res && res.success && res.data) ? res.data : [];
-      if (list.length > 0) {
-        const req = list[0];
-        const isExpired = util.isRequestExpired(req);
-        isWarm = req.status === 'approved' && !isExpired;
-      }
+    fetchRequestWarm().then(isWarm => {
       this.setData({ isWarm: isWarm });
-      wx.setNavigationBarColor({
-        frontColor: '#ffffff',
-        backgroundColor: isWarm ? '#C2410C' : '#1558C7',
-        animation: { duration: 300, timingFunc: 'easeIn' }
-      });
+      util.setWarmNavColor(isWarm);
     }).catch(() => {});
-  },
-
-  formatDateStr: function (date) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return y + '-' + m + '-' + d;
   },
 
   goToLogin: function () {
@@ -104,7 +86,7 @@ Page({
               const d = new Date(today);
               while (d.getDay() !== matchedDay) d.setDate(d.getDate() + 1);
               while (d <= deadline) {
-                datesSet.add(this.formatDateStr(d));
+                datesSet.add(util.formatDate(d));
                 d.setDate(d.getDate() + 7);
               }
             }
@@ -128,7 +110,7 @@ Page({
   buildCalendar: function () {
     const { currentYear, currentMonth, courseDatesSet } = this.data;
     const today = new Date();
-    const todayStr = this.formatDateStr(today);
+    const todayStr = util.formatDate(today);
 
     const firstDay = new Date(currentYear, currentMonth - 1, 1).getDay();
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
@@ -171,12 +153,12 @@ Page({
     for (let i = 0; i < 7; i++) {
       const wd = new Date(monday);
       wd.setDate(monday.getDate() + i);
-      weekDays.push(this.formatDateStr(wd));
+      weekDays.push(util.formatDate(wd));
     }
 
     return {
-      start: this.formatDateStr(monday),
-      end: this.formatDateStr(sunday),
+      start: util.formatDate(monday),
+      end: util.formatDate(sunday),
       startLabel: (monday.getMonth() + 1) + '/' + monday.getDate(),
       endLabel: (sunday.getMonth() + 1) + '/' + sunday.getDate(),
       weekDays: weekDays
@@ -246,7 +228,7 @@ Page({
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const todayStr = this.formatDateStr(today);
+    const todayStr = util.formatDate(today);
 
     // 收集整周所有课程，按日期+时间去重
     const weekCourseList = [];
@@ -254,7 +236,7 @@ Page({
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
-      const dateStr = this.formatDateStr(d);
+      const dateStr = util.formatDate(d);
       const courses = this.getCoursesForDate(dateStr);
       courses.forEach(c => {
         const key = dateStr + '_' + (c.timeSlot || '') + '_' + c.className;

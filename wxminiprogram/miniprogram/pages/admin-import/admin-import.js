@@ -1,13 +1,5 @@
 const { callAdminApi } = require('../../utils/api.js');
-const app = getApp();
-
-function ensureAdmin() {
-  if (!app.globalData.isAdmin) {
-    wx.reLaunch({ url: '/pages/admin/admin' });
-    return false;
-  }
-  return true;
-}
+const util = require('../../utils/util.js');
 
 Page({
   data: {
@@ -19,15 +11,15 @@ Page({
   },
 
   onLoad: function () {
-    ensureAdmin();
+    util.ensureAdmin();
   },
 
   onShow: function () {
-    ensureAdmin();
+    util.ensureAdmin();
   },
 
   downloadTemplate: function () {
-    if (!ensureAdmin()) return;
+    if (!util.ensureAdmin()) return;
     this.setData({ downloading: true });
     wx.showLoading({ title: '正在生成模板...' });
 

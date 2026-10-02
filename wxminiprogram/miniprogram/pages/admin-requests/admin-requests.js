@@ -1,14 +1,5 @@
 const util = require('../../utils/util.js');
 const { callAdminApi } = require('../../utils/api.js');
-const app = getApp();
-
-function ensureAdmin() {
-  if (!app.globalData.isAdmin) {
-    wx.reLaunch({ url: '/pages/admin/admin' });
-    return false;
-  }
-  return true;
-}
 
 Page({
   data: {
@@ -19,7 +10,7 @@ Page({
   },
 
   onShow: function () {
-    if (!ensureAdmin()) return;
+    if (!util.ensureAdmin()) return;
     this.loadRequests();
   },
 
@@ -31,7 +22,7 @@ Page({
           const isExpired = util.isRequestExpired(item);
           return {
             ...item,
-            createdAtText: this.formatDate(item.createdAt),
+            createdAtText: util.formatDateTime(item.createdAt),
             isExpired: isExpired
           };
         });
@@ -43,17 +34,6 @@ Page({
         wx.showToast({ title: '加载失败', icon: 'none' });
         console.error(err);
       });
-  },
-
-  formatDate: function (date) {
-    if (!date) return '';
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const hour = String(d.getHours()).padStart(2, '0');
-    const minute = String(d.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hour}:${minute}`;
   },
 
   switchTab: function (e) {

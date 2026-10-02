@@ -1,6 +1,6 @@
 const app = getApp();
 const util = require('../../utils/util.js');
-const { callUserApi } = require('../../utils/api.js');
+const { callUserApi, fetchRequestWarm } = require('../../utils/api.js');
 
 Page({
   data: {
@@ -19,25 +19,14 @@ Page({
       this.loadIdCard(userInfo.phone);
     } else {
       this.setData({ isWarm: false, maskedIdCard: '' });
-      wx.setNavigationBarColor({ frontColor: '#ffffff', backgroundColor: '#1558C7', animation: { duration: 300, timingFunc: 'easeIn' } });
+      util.setWarmNavColor(false);
     }
   },
 
   loadWarmStatus: function (phone) {
-    callUserApi('getMyRequests', { limit: 1 }).then(res => {
-      let isWarm = false;
-      const list = (res && res.success && res.data) ? res.data : [];
-      if (list.length > 0) {
-        const req = list[0];
-        const isExpired = util.isRequestExpired(req);
-        isWarm = req.status === 'approved' && !isExpired;
-      }
+    fetchRequestWarm().then(isWarm => {
       this.setData({ isWarm: isWarm });
-      wx.setNavigationBarColor({
-        frontColor: '#ffffff',
-        backgroundColor: isWarm ? '#C2410C' : '#1558C7',
-        animation: { duration: 300, timingFunc: 'easeIn' }
-      });
+      util.setWarmNavColor(isWarm);
     }).catch(() => {});
   },
 
