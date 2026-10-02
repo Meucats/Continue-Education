@@ -9,7 +9,7 @@ const crypto = require('crypto');
 
 // 读取配置
 const configPath = path.join(__dirname, 'config.json');
-let config = { env: 'cloud1-d6gio7v8iff39bab7', secretId: '', secretKey: '', appId: '', appSecret: '', adminApiSecret: '' };
+let config = { env: 'cloud1-d6gio7v8iff39bab7', appId: '', appSecret: '', adminApiSecret: '' };
 if (fs.existsSync(configPath)) {
   config = { ...config, ...JSON.parse(fs.readFileSync(configPath, 'utf8')) };
 }
@@ -642,11 +642,6 @@ function generateCourseDatesMulti(schedule, startDate, endDate) {
   return allDates;
 }
 
-// 根据上课时间段+日期范围生成 courseDates（用于小程序端）
-function generateCourseDatesFromSchedule(schedule, startDate, endDate) {
-  return generateCourseDates(schedule, startDate, endDate);
-}
-
 // ====== 入校申请 ======
 app.get('/api/requests', async (req, res) => {
   try {
@@ -713,15 +708,6 @@ app.post('/api/accounts/sync', async (req, res) => {
 });
 
 // ====== 统计 ======
-app.get('/api/stats', async (req, res) => {
-  try {
-    const result = await callCloudFunction('getStats', { actorRole: req.admin.role, actorClasses: req.admin.classes || [] });
-    res.json(result);
-  } catch (err) {
-    res.json({ success: false, message: err.message });
-  }
-});
-
 app.get('/api/stats/detail', async (req, res) => {
   try {
     const result = await callCloudFunction('getStats', { actorRole: req.admin.role, actorClasses: req.admin.classes || [] });

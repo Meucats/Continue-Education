@@ -111,10 +111,8 @@ Page({
       cloudPath: cloudPath,
       filePath: this.data.filePath,
       success: (uploadRes) => {
-        console.log('文件上传成功', uploadRes.fileID);
         callAdminApi('importStudents', null, { fileID: uploadRes.fileID }).then(result => {
           wx.hideLoading();
-          console.log('导入结果', result);
           if (result && result.success) {
             this.setData({
               importResult: {

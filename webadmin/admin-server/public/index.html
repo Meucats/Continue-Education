@@ -1953,14 +1953,16 @@ function closeImportModal() { document.getElementById('studentImportModal').clas
 let selectedFile = null;
 
 const uploadZone = document.getElementById('uploadZone');
-uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
-uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
-uploadZone.addEventListener('drop', e => {
-    e.preventDefault();
-    uploadZone.classList.remove('dragover');
-    if (e.dataTransfer.files.length) handleFileSelected(e.dataTransfer.files[0]);
-});
-uploadZone.addEventListener('click', () => document.getElementById('fileInput').click());
+if (uploadZone) {
+    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleFileSelected(e.dataTransfer.files[0]);
+    });
+    uploadZone.addEventListener('click', () => document.getElementById('fileInput').click());
+}
 
 function handleFileSelect(e) { if (e.target.files.length) handleFileSelected(e.target.files[0]); }
 
