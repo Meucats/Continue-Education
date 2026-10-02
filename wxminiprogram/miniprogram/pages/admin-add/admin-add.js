@@ -84,14 +84,17 @@ Page({
       this.setData({ generatedDates: [] });
       return;
     }
+    this.setData({ generatedDates: this.generateCourseDatesMulti(schedule, courseStartDate, courseEndDate) });
+  },
+
+  // 多时间段（逗号分隔）合并生成，预览与保存共用，保证预览=落库
+  generateCourseDatesMulti: function (schedule, startDate, endDate) {
     const allDates = [];
-    const parts = schedule.split(/[,，]/).map(s => s.trim()).filter(Boolean);
-    parts.forEach(part => {
-      const dates = this.generateCourseDates(part, courseStartDate, courseEndDate);
-      allDates.push(...dates);
+    String(schedule || '').split(/[,，]/).map(s => s.trim()).filter(Boolean).forEach(part => {
+      allDates.push(...this.generateCourseDates(part, startDate, endDate));
     });
     allDates.sort((a, b) => a.date.localeCompare(b.date));
-    this.setData({ generatedDates: allDates });
+    return allDates;
   },
 
   // 生成单个时间段的上课日期
@@ -141,7 +144,7 @@ Page({
 
     this.setData({ submitting: true });
 
-    const courseDates = this.generateCourseDates(formData.schedule, formData.courseStartDate, formData.courseEndDate);
+    const courseDates = this.generateCourseDatesMulti(formData.schedule, formData.courseStartDate, formData.courseEndDate);
 
     const data = {
       name: formData.name.trim(),

@@ -123,7 +123,7 @@ function loginRateLimited(key) {
   if (!rec) return false;
   if (rec.until > now) return true;
   if (now - rec.first > 10 * 60 * 1000) { loginAttempts.delete(key); return false; }
-  return rec.count >= 5 && rec.until > now;
+  return false;
 }
 function recordLoginFail(key) {
   const now = Date.now();
@@ -473,16 +473,16 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
       const row = jsonData[i];
       const rowNum = i + 2;
       try {
-        const name = getField(row, fieldMap, 'name');
-        const phone = String(getField(row, fieldMap, 'phone') || '').trim();
-        const idCard = getField(row, fieldMap, 'idCard');
-        const company = getField(row, fieldMap, 'company');
-        const className = getField(row, fieldMap, 'className');
-        const schedule = getField(row, fieldMap, 'schedule');
-        const courseStartDate = getField(row, fieldMap, 'courseStartDate');
+        const name = asStr(getField(row, fieldMap, 'name'));
+        const phone = asStr(getField(row, fieldMap, 'phone'));
+        const idCard = asStr(getField(row, fieldMap, 'idCard'));
+        const company = asStr(getField(row, fieldMap, 'company'));
+        const className = asStr(getField(row, fieldMap, 'className'));
+        const schedule = asStr(getField(row, fieldMap, 'schedule'));
+        const courseStartDate = getField(row, fieldMap, 'courseStartDate'); // 原始值：字符串或 Excel 日期序列号
         const courseEndDate = getField(row, fieldMap, 'courseEndDate');
         const deadline = getField(row, fieldMap, 'deadline');
-        const location = getField(row, fieldMap, 'location');
+        const location = asStr(getField(row, fieldMap, 'location'));
 
         if (!name) { errors.push(`第${rowNum}行：姓名为空`); failed++; continue; }
         if (!phone || phone.length !== 11) { errors.push(`第${rowNum}行：手机号格式错误`); failed++; continue; }
@@ -499,7 +499,7 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
         const startStr = formatDateStr(startD) || String(courseStartDate || '');
         const endStr = formatDateStr(endD) || String(courseEndDate || '');
 
-        const studentData = { name, phone, idCard: idCard || '', company: company || '', className, schedule, deadline: endStr || '', location, courseDates, courseStartDate: startStr, courseEndDate: endStr };
+        const studentData = { name, phone, idCard: idCard || '', company: company || '', className, schedule, deadline: formatDateStr(parseExcelDate(deadline)) || endStr || '', location, courseDates, courseStartDate: startStr, courseEndDate: endStr };
         const result = await callCloudFunction('addStudent', { data: studentData });
         if (result.message && result.message.includes('更新')) updated++; else added++;
       } catch (err) {
@@ -508,7 +508,6 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
       }
     }
 
-    fs.unlinkSync(req.file.path);
     res.json({ success: true, data: { total: jsonData.length, added, updated, failed, errors } });
   } catch (err) {
     res.json({ success: false, message: err.message });
@@ -517,31 +516,67 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
   }
 });
 
+// 表头→字段映射：先精确命中别名，再按“最长别名包含”兑底（与 adminApi/index.js 必须逐字一致，由 scripts/check-excel-aliases.js 守卫）
 function detectFieldMapping(headers) {
   const map = {};
   const aliases = {
     name: ['姓名', '名字', 'name', '学员姓名', '学生姓名'],
     phone: ['联系电话', '手机号', '手机', '电话', 'phone', '手机号码', '联系手机'],
-    idCard: ['身份证号码', '身份证', '身份证号', 'idCard', '身份证件号码'],
+    idCard: ['身份证号码', '身份证', '身份证号', '身份证件号码', '证件号', 'idCard'],
     company: ['公司名称', '公司', '单位', 'company', '所属公司', '工作单位'],
     className: ['班级名称', '班级', '课程名称', '课程', 'className', '班名'],
     schedule: ['上课时间段', '上课时间', '时间', 'schedule', '时间段', '课程时间'],
     courseStartDate: ['课程开始日期', '开始日期', '课程开始', 'courseStartDate'],
     courseEndDate: ['课程结束日期', '结束日期', '课程结束', 'courseEndDate'],
-    deadline: ['上课截止时间', '截止时间', '截止日期', 'deadline', '结束时间', '到期时间'],
+    deadline: ['上课截止时间', '截止时间', '截止日期', '结束时间', '到期时间', 'deadline', '截止'],
     location: ['上课地点', '地点', '教室', 'location', '校区', '上课教室']
   };
-  for (const [field, names] of Object.entries(aliases)) {
-    for (const name of names) {
-      if (headers.find(h => String(h).trim() === name)) { map[field] = name; break; }
+  const fields = Object.keys(aliases);
+  const raw = headers.map(h => (h === undefined || h === null) ? '' : h);
+  const clean = raw.map(h => String(h).trim());
+  // 1) 精确命中：每个表头最多认领一个字段
+  clean.forEach((h, i) => {
+    if (!h) return;
+    for (const f of fields) {
+      if (!map[f] && aliases[f].indexOf(h) > -1) { map[f] = raw[i]; return; }
     }
+  });
+  // 2) 包含兑底：剩余表头按最长别名命中优先，避免短别名抢走更贴切的字段
+  const candidates = [];
+  clean.forEach((h, i) => {
+    if (!h) return;
+    for (const f of fields) {
+      if (map[f]) continue;
+      let best = '';
+      for (const n of aliases[f]) {
+        if (h.indexOf(n) > -1 && n.length > best.length) best = n;
+      }
+      if (best) candidates.push({ i: i, f: f, len: best.length });
+    }
+  });
+  candidates.sort((a, b) => b.len - a.len || a.i - b.i);
+  const used = {};
+  for (const f of fields) { if (map[f] !== undefined) used[map[f]] = true; }
+  for (const c of candidates) {
+    const hdr = raw[c.i];
+    if (map[c.f] !== undefined || used[hdr]) continue;
+    map[c.f] = hdr;
+    used[hdr] = true;
   }
   return map;
 }
 
+// 按映射表头取值：字符串去空白，数字原样保留（Excel 日期序列号依赖数字）
 function getField(row, fieldMap, field) {
-  return fieldMap[field] ? (row[fieldMap[field]] || '') : '';
+  const key = fieldMap[field];
+  if (key === undefined || key === null) return '';
+  const v = row[key];
+  if (v === undefined || v === null) return '';
+  return typeof v === 'string' ? v.trim() : v;
 }
+
+// 文本字段统一转字符串（电话等数字单元格导入时走这里）
+const asStr = v => (v === undefined || v === null ? '' : String(v).trim());
 
 // 将Excel日期值（字符串或序列号数字）统一转为 Date 对象
 function parseExcelDate(val) {
@@ -661,7 +696,7 @@ app.post('/api/students/:id/reset-password', async (req, res) => {
 
 app.get('/api/accounts', async (req, res) => {
   try {
-    const result = await callCloudFunction('getAccounts');
+    const result = await callCloudFunction('getAccounts', { actorRole: req.admin.role, actorClasses: req.admin.classes || [] });
     res.json(result);
   } catch (err) {
     res.json({ success: false, message: err.message });

@@ -19,7 +19,7 @@ const PRELOGIN_ACTIONS = new Set(['changeAdminPassword']);
 // 学员会话可访问的 action
 const STUDENT_ACTIONS = new Set(['getStudentSelf', 'getMyRequests', 'upsertMyUser']);
 // 仅超管（或服务端）可访问
-const SUPERADMIN_ACTIONS = new Set(['addAdmin', 'updateAdmin', 'deleteAdmin', 'resetAdminPassword', 'importAdmins', 'initDefaultAdmin', 'exportAll']);
+const SUPERADMIN_ACTIONS = new Set(['addAdmin', 'updateAdmin', 'deleteAdmin', 'resetAdminPassword', 'importAdmins', 'initDefaultAdmin', 'exportAll', 'repairCourseDates']);
 
 // 登录/改密限速（复审 #9：持久化到 rate_limits 集合 —— 多实例共享、重启不清零，无需 Redis）
 // 阈值：10 分钟窗口内失败 5 次 → 锁定 10 分钟；过期记录在下次命中时懒清理
@@ -198,6 +198,119 @@ async function classNamesAggregate() {
   }
 }
 
+// ====== 排课日期生成（addStudent/updateStudent/importStudents/repairCourseDates 共用）======
+// 将Excel日期值（字符串或序列号数字）转为 Date 对象
+function parseExcelDate(val) {
+  if (!val) return null;
+  if (typeof val === 'number') return new Date((val - 25569) * 86400 * 1000);
+  const s = String(val).trim();
+  if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(s)) return new Date(s.replace(/-/g, '/'));
+  return null;
+}
+
+function formatDateStr(d) {
+  if (!d || isNaN(d.getTime())) return '';
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// 根据上课时间段+开始结束日期，自动生成具体上课日期（单个时间段）
+function generateCourseDates(schedule, startDate, endDate) {
+  if (!schedule || !startDate || !endDate) return [];
+  const dayMap = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '日': 0 };
+  let targetDay = -1;
+  for (const [key, val] of Object.entries(dayMap)) {
+    if (schedule.includes(key)) { targetDay = val; break; }
+  }
+  if (targetDay < 0) return [];
+  const timeMatch = schedule.match(/(\d{1,2}:\d{2})\s*[-~]\s*(\d{1,2}:\d{2})/);
+  const timeSlot = timeMatch ? timeMatch[0] : schedule;
+  const start = parseExcelDate(startDate);
+  const end = parseExcelDate(endDate);
+  if (!start || !end) return [];
+  const dates = [];
+  const d = new Date(start);
+  while (d.getDay() !== targetDay && d <= end) d.setDate(d.getDate() + 1);
+  while (d <= end) {
+    dates.push({ date: formatDateStr(d), timeSlot });
+    d.setDate(d.getDate() + 7);
+  }
+  return dates;
+}
+
+// 支持逗号分隔的多时间段
+function generateCourseDatesMulti(schedule, startDate, endDate) {
+  const allDates = [];
+  const parts = String(schedule || '').split(/[,，]/).map(s => s.trim()).filter(Boolean);
+  parts.forEach(part => {
+    const dates = generateCourseDates(part, startDate, endDate);
+    allDates.push(...dates);
+  });
+  allDates.sort((a, b) => a.date.localeCompare(b.date));
+  return allDates;
+}
+
+// 表头→字段映射：先精确命中别名，再按“最长别名包含”兑底（与 server.js 必须逐字一致，由 scripts/check-excel-aliases.js 守卫）
+function detectFieldMapping(headers) {
+  const map = {};
+  const aliases = {
+    name: ['姓名', '名字', 'name', '学员姓名', '学生姓名'],
+    phone: ['联系电话', '手机号', '手机', '电话', 'phone', '手机号码', '联系手机'],
+    idCard: ['身份证号码', '身份证', '身份证号', '身份证件号码', '证件号', 'idCard'],
+    company: ['公司名称', '公司', '单位', 'company', '所属公司', '工作单位'],
+    className: ['班级名称', '班级', '课程名称', '课程', 'className', '班名'],
+    schedule: ['上课时间段', '上课时间', '时间', 'schedule', '时间段', '课程时间'],
+    courseStartDate: ['课程开始日期', '开始日期', '课程开始', 'courseStartDate'],
+    courseEndDate: ['课程结束日期', '结束日期', '课程结束', 'courseEndDate'],
+    deadline: ['上课截止时间', '截止时间', '截止日期', '结束时间', '到期时间', 'deadline', '截止'],
+    location: ['上课地点', '地点', '教室', 'location', '校区', '上课教室']
+  };
+  const fields = Object.keys(aliases);
+  const raw = headers.map(h => (h === undefined || h === null) ? '' : h);
+  const clean = raw.map(h => String(h).trim());
+  // 1) 精确命中：每个表头最多认领一个字段
+  clean.forEach((h, i) => {
+    if (!h) return;
+    for (const f of fields) {
+      if (!map[f] && aliases[f].indexOf(h) > -1) { map[f] = raw[i]; return; }
+    }
+  });
+  // 2) 包含兑底：剩余表头按最长别名命中优先，避免短别名抢走更贴切的字段
+  const candidates = [];
+  clean.forEach((h, i) => {
+    if (!h) return;
+    for (const f of fields) {
+      if (map[f]) continue;
+      let best = '';
+      for (const n of aliases[f]) {
+        if (h.indexOf(n) > -1 && n.length > best.length) best = n;
+      }
+      if (best) candidates.push({ i: i, f: f, len: best.length });
+    }
+  });
+  candidates.sort((a, b) => b.len - a.len || a.i - b.i);
+  const used = {};
+  for (const f of fields) { if (map[f] !== undefined) used[map[f]] = true; }
+  for (const c of candidates) {
+    const hdr = raw[c.i];
+    if (map[c.f] !== undefined || used[hdr]) continue;
+    map[c.f] = hdr;
+    used[hdr] = true;
+  }
+  return map;
+}
+
+// 按映射表头取值：字符串去空白，数字原样保留（Excel 日期序列号依赖数字）
+function getField(row, fieldMap, field) {
+  const key = fieldMap[field];
+  if (key === undefined || key === null) return '';
+  const v = row[key];
+  if (v === undefined || v === null) return '';
+  return typeof v === 'string' ? v.trim() : v;
+}
+
+// 文本字段统一转字符串（电话等数字单元格导入时走这里）
+const asStr = v => (v === undefined || v === null ? '' : String(v).trim());
+
 exports.main = async (event, context) => {
   const { action, data, id, status, reason, keyword, token, secret } = event;
 
@@ -268,15 +381,19 @@ exports.main = async (event, context) => {
       }
       // 初始密码：身份证后6位，没身份证用手机后6位
       const initPassword = (idCard && idCard.length >= 6) ? idCard.slice(-6) : phone.slice(-6);
+      // 落库前统一按 schedule+课程起止日期重算（多时段）；三要素不全时才用客户端传值兜底
+      const calcDates = (schedule && courseStartDate && courseEndDate)
+        ? generateCourseDatesMulti(schedule, courseStartDate, courseEndDate)
+        : (courseDates || []);
       const existing = await db.collection('students').where({ phone }).get();
       if (existing.data.length > 0) {
         await db.collection('students').doc(existing.data[0]._id).update({
-          data: { name, className, schedule, deadline: deadline || '', location, courseDates: courseDates || [], courseStartDate: courseStartDate || '', courseEndDate: courseEndDate || '', idCard: idCard || '', company: company || '', updatedAt: new Date() }
+          data: { name, className, schedule, deadline: deadline || '', location, courseDates: calcDates, courseStartDate: courseStartDate || '', courseEndDate: courseEndDate || '', idCard: idCard || '', company: company || '', updatedAt: new Date() }
         });
         return { success: true, message: '学员信息已更新', id: existing.data[0]._id };
       }
       const res = await db.collection('students').add({
-        data: { name, phone, className, schedule, deadline: deadline || '', location, courseDates: courseDates || [], courseStartDate: courseStartDate || '', courseEndDate: courseEndDate || '', idCard: idCard || '', company: company || '', password: hashPassword(initPassword), mustChangePassword: true, createdAt: new Date() }
+        data: { name, phone, className, schedule, deadline: deadline || '', location, courseDates: calcDates, courseStartDate: courseStartDate || '', courseEndDate: courseEndDate || '', idCard: idCard || '', company: company || '', password: hashPassword(initPassword), mustChangePassword: true, createdAt: new Date() }
       });
       return { success: true, message: '学员添加成功', id: res._id, initPassword };
     }
@@ -284,7 +401,11 @@ exports.main = async (event, context) => {
     case 'updateStudent': {
       const { _id, name, phone, className, schedule, deadline, location, courseDates, courseStartDate, courseEndDate, idCard, company } = data;
       if (!_id) return { success: false, message: '缺少学员ID' };
-      const updateData = { name, phone, className, schedule, deadline: deadline || '', location, courseDates: courseDates || [], courseStartDate: courseStartDate || '', courseEndDate: courseEndDate || '', updatedAt: new Date() };
+      // 落库前统一按 schedule+课程起止日期重算（多时段）；三要素不全时才用客户端传值兜底
+      const calcDates = (schedule && courseStartDate && courseEndDate)
+        ? generateCourseDatesMulti(schedule, courseStartDate, courseEndDate)
+        : (courseDates || []);
+      const updateData = { name, phone, className, schedule, deadline: deadline || '', location, courseDates: calcDates, courseStartDate: courseStartDate || '', courseEndDate: courseEndDate || '', updatedAt: new Date() };
       if (idCard !== undefined) updateData.idCard = idCard;
       if (company !== undefined) updateData.company = company;
       await db.collection('students').doc(_id).update({ data: updateData });
@@ -293,19 +414,55 @@ exports.main = async (event, context) => {
 
     case 'deleteStudent': {
       if (!id) return { success: false, message: '缺少学员ID' };
+      let stuPhone = '';
+      try {
+        const stu = await db.collection('students').doc(id).get();
+        stuPhone = (stu.data && stu.data.phone) || '';
+      } catch (e) { /* 学员不存在也继续删（幂等） */ }
       await db.collection('students').doc(id).remove();
+      // 账户同步：学员删除后其登录账户与会话一并清除，保持与学员列表一致
+      if (stuPhone) {
+        await db.collection('users').where({ phone: stuPhone }).remove().catch(() => {});
+        await revokeSessions(stuPhone, 'student');
+      }
       return { success: true, message: '删除成功' };
     }
 
     case 'batchDeleteStudents': {
       const { ids } = data;
       if (!ids || ids.length === 0) return { success: false, message: '请选择要删除的学员' };
+      // 先取手机号：删完学员后需联动删账户/吊销会话
+      const phones = [];
+      try {
+        const docs = await db.collection('students').where({ _id: _.in(ids) }).field({ phone: 1 }).limit(1000).get();
+        docs.data.forEach(s => { if (s.phone) phones.push(s.phone); });
+      } catch (e) {
+        for (const sid of ids) {
+          try {
+            const d = await db.collection('students').doc(sid).get();
+            if (d.data && d.data.phone) phones.push(d.data.phone);
+          } catch (e2) { /* 读不到则跳过该条的账户联动 */ }
+        }
+      }
       try {
         // 一条语句批量删（复审 #7）；个别环境不支持 _id + _.in 时回退逐条删
         await db.collection('students').where({ _id: _.in(ids) }).remove();
       } catch (e) {
         for (const id of ids) {
           await db.collection('students').doc(id).remove();
+        }
+      }
+      const uniqPhones = [...new Set(phones)];
+      if (uniqPhones.length) {
+        try {
+          await db.collection('users').where({ phone: _.in(uniqPhones) }).remove();
+        } catch (e) {
+          for (const p of uniqPhones) {
+            await db.collection('users').where({ phone: p }).remove().catch(() => {});
+          }
+        }
+        for (const p of uniqPhones) {
+          await revokeSessions(p, 'student');
         }
       }
       return { success: true, message: `成功删除 ${ids.length} 名学员` };
@@ -527,18 +684,52 @@ exports.main = async (event, context) => {
     }
 
     // ====== 账户管理 ======
+    // 账户列表：拼学员资料补齐公司/班级/上课时间（不带身份证等敏感字段）；只列仍有学员对应的账户；受限管理员只看本班账户（与 getStudents 班级隔离一致）
     case 'getAccounts': {
+      const actor = getActor(event, session);
+      const filtered = classFiltered(actor);
       const count = await db.collection('users').count();
-      const result = await db.collection('users').orderBy('createdAt', 'desc').limit(200).get();
-      return { success: true, data: result.data.map(stripSecrets), total: count.total, truncated: result.data.length < count.total };
+      const result = await db.collection('users').orderBy('createdAt', 'desc').limit(1000).get();
+      const phones = [...new Set(result.data.map(u => u.phone).filter(Boolean))];
+      const stuMap = {};
+      if (phones.length) {
+        const cond = { phone: _.in(phones) };
+        if (filtered) cond.className = _.in(actor.classes);
+        const stus = (await db.collection('students')
+          .where(cond)
+          .field({ phone: 1, name: 1, company: 1, className: 1, schedule: 1 })
+          .limit(1000).get()).data;
+        for (const s of stus) stuMap[s.phone] = s;
+      }
+      const data = result.data.reduce((acc, u) => {
+        const s = stuMap[u.phone];
+        // 学员已删除的孤儿账户不再展示（账户列表与学员列表保持一致；清理见 syncAccounts）
+        if (!s) return acc;
+        acc.push({
+          _id: u._id,
+          name: s.name || u.name || '',
+          phone: u.phone || '',
+          role: u.role || 'student',
+          company: s.company || '',
+          className: s.className || '',
+          schedule: s.schedule || '',
+          createdAt: u.createdAt
+        });
+        return acc;
+      }, []);
+      const fetchTruncated = result.data.length < count.total;
+      const total = filtered ? data.length : (fetchTruncated ? count.total : data.length);
+      return { success: true, data, total, truncated: filtered ? data.length >= 1000 : fetchTruncated };
     }
 
     case 'syncAccounts': {
+      const stuCount = await db.collection('students').count();
       const studentsRes = await db.collection('students').limit(1000).get();
       const accountsRes = await db.collection('users').limit(1000).get();
       const students = studentsRes.data;
       const accounts = accountsRes.data;
       let count = 0;
+      const stuPhones = new Set(students.map(s => s.phone).filter(Boolean));
       for (const s of students) {
         if (!accounts.find(a => a.phone === s.phone)) {
           await db.collection('users').add({
@@ -550,7 +741,17 @@ exports.main = async (event, context) => {
           count++;
         }
       }
-      return { success: true, message: `同步了 ${count} 个新账户` };
+      // 反向同步：学员已删除的账户一并清理（学员必须全量取到，避免超过单次上限时误删）
+      let removed = 0;
+      if (students.length >= stuCount.total) {
+        for (const a of accounts) {
+          if (a.phone && !stuPhones.has(a.phone)) {
+            await db.collection('users').doc(a._id).remove().catch(() => {});
+            removed++;
+          }
+        }
+      }
+      return { success: true, message: `同步了 ${count} 个新账户${removed ? `，清理了 ${removed} 个已删除学员的账户` : ''}` };
     }
 
     // ====== 统计 ======
@@ -631,82 +832,10 @@ exports.main = async (event, context) => {
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
       const headers = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] || [];
 
-      // 自动识别表头
-      const fieldMap = {};
-      const aliases = {
-        name: ['姓名', '名字', 'name', '学员姓名', '学生姓名'],
-        phone: ['联系电话', '手机号', '手机', '电话', 'phone', '手机号码'],
-        className: ['班级名称', '班级', '课程名称', '课程', 'className'],
-        schedule: ['上课时间段', '上课时间', '时间', 'schedule', '时间段'],
-        courseStartDate: ['课程开始日期', '开始日期', '课程开始', 'courseStartDate'],
-        courseEndDate: ['课程结束日期', '结束日期', '课程结束', 'courseEndDate'],
-        deadline: ['上课截止时间', '截止时间', '截止', 'deadline'],
-        location: ['上课地点', '地点', 'location', '教室'],
-        idCard: ['身份证号', '身份证', '证件号', 'idCard'],
-        company: ['工作单位', '单位', '公司', 'company']
-      };
-      headers.forEach((h, i) => {
-        const header = String(h).trim();
-        for (const [field, names] of Object.entries(aliases)) {
-          if (names.some(n => header.includes(n))) { fieldMap[field] = i; break; }
-        }
-      });
+      // 表头自动识别（与 server.js 同一份实现，scripts/check-excel-aliases.js 守卫）
+      const fieldMap = detectFieldMapping(headers);
 
-      function getVal(row, field) {
-        const idx = fieldMap[field];
-        if (idx === undefined) return '';
-        const val = row[Object.keys(row)[idx]];
-        return val !== undefined ? String(val).trim() : '';
-      }
-
-      // 将Excel日期值（字符串或序列号数字）转为 Date 对象
-      function parseExcelDate(val) {
-        if (!val) return null;
-        if (typeof val === 'number') return new Date((val - 25569) * 86400 * 1000);
-        const s = String(val).trim();
-        if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(s)) return new Date(s.replace(/-/g, '/'));
-        return null;
-      }
-      function formatDateStr(d) {
-        if (!d || isNaN(d.getTime())) return '';
-        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-      }
-
-      // 生成排课日期
-      function generateCourseDates(schedule, startDate, endDate) {
-        if (!schedule || !startDate || !endDate) return [];
-        const dayMap = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '日': 0 };
-        let targetDay = -1;
-        for (const [key, val] of Object.entries(dayMap)) {
-          if (schedule.includes(key)) { targetDay = val; break; }
-        }
-        if (targetDay < 0) return [];
-        const timeMatch = schedule.match(/(\d{1,2}:\d{2})\s*[-~]\s*(\d{1,2}:\d{2})/);
-        const timeSlot = timeMatch ? timeMatch[0] : schedule;
-        const start = parseExcelDate(startDate);
-        const end = parseExcelDate(endDate);
-        if (!start || !end) return [];
-        const dates = [];
-        const d = new Date(start);
-        while (d.getDay() !== targetDay && d <= end) d.setDate(d.getDate() + 1);
-        while (d <= end) {
-          dates.push({ date: formatDateStr(d), timeSlot });
-          d.setDate(d.getDate() + 7);
-        }
-        return dates;
-      }
-
-      // 支持逗号分隔的多时间段
-      function generateCourseDatesMulti(schedule, startDate, endDate) {
-        const allDates = [];
-        const parts = schedule.split(/[,，]/).map(s => s.trim()).filter(Boolean);
-        parts.forEach(part => {
-          const dates = generateCourseDates(part, startDate, endDate);
-          allDates.push(...dates);
-        });
-        allDates.sort((a, b) => a.date.localeCompare(b.date));
-        return allDates;
-      }
+      // 日期解析与排课日期生成已提升到模块级（parseExcelDate/formatDateStr/generateCourseDates/generateCourseDatesMulti）
 
       let added = 0, updated = 0, failed = 0;
       const errors = [];
@@ -715,16 +844,16 @@ exports.main = async (event, context) => {
         const row = jsonData[i];
         const rowNum = i + 2;
         try {
-          const name = getVal(row, 'name');
-          const phone = getVal(row, 'phone');
-          const idCard = getVal(row, 'idCard');
-          const company = getVal(row, 'company');
-          const className = getVal(row, 'className');
-          const schedule = getVal(row, 'schedule');
-          const courseStartDate = getVal(row, 'courseStartDate');
-          const courseEndDate = getVal(row, 'courseEndDate');
-          const deadline = getVal(row, 'deadline');
-          const location = getVal(row, 'location');
+          const name = asStr(getField(row, fieldMap, 'name'));
+          const phone = asStr(getField(row, fieldMap, 'phone'));
+          const idCard = asStr(getField(row, fieldMap, 'idCard'));
+          const company = asStr(getField(row, fieldMap, 'company'));
+          const className = asStr(getField(row, fieldMap, 'className'));
+          const schedule = asStr(getField(row, fieldMap, 'schedule'));
+          const courseStartDate = getField(row, fieldMap, 'courseStartDate'); // 原始值：字符串或 Excel 日期序列号
+          const courseEndDate = getField(row, fieldMap, 'courseEndDate');
+          const deadline = getField(row, fieldMap, 'deadline');
+          const location = asStr(getField(row, fieldMap, 'location'));
 
           if (!name) { errors.push(`第${rowNum}行：姓名为空`); failed++; continue; }
           if (!phone || phone.length !== 11) { errors.push(`第${rowNum}行：手机号格式错误`); failed++; continue; }
@@ -735,7 +864,7 @@ exports.main = async (event, context) => {
           const courseDates = generateCourseDatesMulti(schedule, courseStartDate, courseEndDate);
           const startStr = formatDateStr(parseExcelDate(courseStartDate)) || String(courseStartDate || '');
           const endStr = formatDateStr(parseExcelDate(courseEndDate)) || String(courseEndDate || '');
-          const studentData = { name, phone, idCard: idCard || '', company: company || '', className, schedule, deadline: endStr || '', location, courseDates, courseStartDate: startStr, courseEndDate: endStr };
+          const studentData = { name, phone, idCard: idCard || '', company: company || '', className, schedule, deadline: formatDateStr(parseExcelDate(deadline)) || endStr || '', location, courseDates, courseStartDate: startStr, courseEndDate: endStr };
 
           const existing = await db.collection('students').where({ phone }).get();
           if (existing.data.length > 0) {
@@ -931,6 +1060,30 @@ exports.main = async (event, context) => {
         }
       }
       return { success: true, data: { total: adminList.length, added: addedA, failed: failedA, errors: errorsA } };
+    }
+
+    // ====== 一次性数据修复：按 schedule+课程起止日期重算 courseDates（修复历史单时段落库问题；幂等可重复执行）======
+    case 'repairCourseDates': {
+      let total = 0, fixed = 0, skipped = 0, courses = 0;
+      let skip = 0;
+      for (;;) {
+        const r = await db.collection('students').orderBy('_id', 'asc').skip(skip).limit(100).get();
+        for (const s of r.data) {
+          total++;
+          if (!s.schedule || !s.courseStartDate || !s.courseEndDate) { skipped++; continue; }
+          const next = generateCourseDatesMulti(s.schedule, s.courseStartDate, s.courseEndDate);
+          const cur = Array.isArray(s.courseDates) ? s.courseDates : [];
+          const same = cur.length === next.length && cur.every((d, i) => d && next[i] && d.date === next[i].date && d.timeSlot === next[i].timeSlot);
+          courses += next.length;
+          if (!same) {
+            await db.collection('students').doc(s._id).update({ data: { courseDates: next, updatedAt: new Date() } });
+            fixed++;
+          }
+        }
+        if (r.data.length < 100) break;
+        skip += r.data.length;
+      }
+      return { success: true, message: `共 ${total} 名学员，修正 ${fixed} 名，跳过 ${skipped} 名`, data: { total, fixed, skipped, courses } };
     }
 
     // ====== 一次性迁移导出（保留至迁移完全完成、云退役确认后再删除）======
