@@ -938,7 +938,7 @@ function escapeHtml(v) {
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 // 行数据注册表：避免把用户数据拼进 onclick 字符串
-const rowStore = { tips: {}, admins: {} };
+const rowStore = { tips: {}, admins: {}, students: {} };
 
 // ============ 动效基座（taste + GSAP + Lenis，标准同步与 cleanup） ============
 const Motion = (() => {
@@ -1096,6 +1096,61 @@ function loadDataFilterOptions(selectId, values, allLabel) {
     sel.innerHTML = `<option value="">${allLabel}</option>` +
         opts.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
     if (keep && opts.indexOf(keep) > -1) sel.value = keep;
+}
+
+// 通用筛选器：cfg = { acKey, nameId, fieldIds, countId, tableId, cols, emptyTitle, source, render, phoneLower, match }
+function makeFilter(cfg) {
+    function filter() {
+        const q = fv(cfg.nameId).toLowerCase();
+        const pin = acState[cfg.acKey].phone;
+        const nameHit = row => pin
+            ? row.phone === pin
+            : (!q || (row.name || '').toLowerCase().includes(q) ||
+                ((cfg.phoneLower ? (row.phone || '').toLowerCase() : (row.phone || '')).includes(q)));
+        const active = !!(q || pin || cfg.fieldIds.some(f => fv(f)));
+        const pred = cfg.match();
+        const list = cfg.source().filter(row => nameHit(row) && pred(row));
+        setFilterCount(cfg.countId, list.length, cfg.source().length);
+        if (active && list.length === 0) {
+            document.getElementById(cfg.tableId).innerHTML = emptyCell(cfg.cols, 'i-search', cfg.emptyTitle, '可减少条件，或点击「重置」恢复全部');
+            return;
+        }
+        cfg.render(list);
+    }
+    function resetUI() {
+        clearFilter(cfg.fieldIds);
+        acState[cfg.acKey].phone = '';
+        acClose(cfg.acKey);
+        const c = document.getElementById(cfg.countId);
+        if (c) c.textContent = '';
+    }
+    function reset() { resetUI(); filter(); }
+    return { filter, resetUI, reset };
+}
+
+// 通用表格加载：骨架 → fetch → onOk → 截断提示（truncId 可选）；失败清骨架
+function loadTable(cfg) {
+    const tbody = document.getElementById(cfg.tableId);
+    tbody.innerHTML = skeletonRows(cfg.cols, cfg.rows);
+    const url = typeof cfg.url === 'function' ? cfg.url() : cfg.url;
+    return apiFetch(url).then(r => r.json()).then(res => {
+        if (res.success) {
+            cfg.onOk(res);
+            if (cfg.truncId) updateTruncHint(cfg.truncId, res);
+        } else if (cfg.truncId) updateTruncHint(cfg.truncId, null);
+    }).catch(() => {
+        if (cfg.truncId) updateTruncHint(cfg.truncId, null);
+        tbody.innerHTML = emptyCell(cfg.cols, 'i-alert', '加载失败', cfg.failHint);
+    });
+}
+
+// 通用确认删除：确认 → DELETE → 成功 toast+重载 / 失败 toast
+function confirmThen(opts) {
+    if (!confirm(opts.msg)) return;
+    apiFetch(opts.url, { method: 'DELETE' }).then(r => r.json()).then(res => {
+        if (res.success) { showToast(opts.okMsg || res.message || '已删除'); if (opts.reload) opts.reload(); }
+        else showToast(res.message, 'error');
+    });
 }
 
 // 姓名联想下拉：模糊匹配姓名/联系电话，条目附带电话用于重名消歧；点击条目把姓名填入输入框并锁定该人
@@ -1262,10 +1317,11 @@ function showForcePasswordChange() {
     document.getElementById('forcePwdModal').classList.add('show');
 }
 
-function submitForcePasswordChange() {
-    const oldPassword = document.getElementById('forceOldPwd').value;
-    const newPassword = document.getElementById('forceNewPwd').value;
-    const confirmPwd = document.getElementById('forceConfirmPwd').value;
+// 通用改密流：校验三件套 → POST /admin/change-password → cfg.onOk(res)
+function changePasswordFlow(cfg) {
+    const oldPassword = document.getElementById(cfg.fields[0]).value;
+    const newPassword = document.getElementById(cfg.fields[1]).value;
+    const confirmPwd = document.getElementById(cfg.fields[2]).value;
     if (!oldPassword) return showToast('请输入原密码', 'error');
     if (newPassword.length < 8) return showToast('新密码至少8位', 'error');
     if (newPassword !== confirmPwd) return showToast('两次输入的新密码不一致', 'error');
@@ -1273,21 +1329,26 @@ function submitForcePasswordChange() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ oldPassword, newPassword })
     }).then(r => r.json()).then(res => {
-        if (res.success) {
-            const session = getSession();
-            if (session && res.data && res.data.token) {
-                session.token = res.data.token;
-                localStorage.setItem('adminLogin', JSON.stringify(session));
-            }
-            document.getElementById('forcePwdModal').classList.remove('show');
-            showToast('密码修改成功');
-            loadDashboard();
-            requestAnimationFrame(() => Motion.adminEntrance());
-        } else {
-            showToast(res.message || '修改失败', 'error');
-        }
+        if (!res.success) return showToast(res.message || '修改失败', 'error');
+        cfg.onOk(res);
     }).catch(err => showToast('修改失败：' + err.message, 'error'));
 }
+
+const forcePwdCfg = {
+    fields: ['forceOldPwd', 'forceNewPwd', 'forceConfirmPwd'],
+    onOk: res => {
+        const session = getSession();
+        if (session && res.data && res.data.token) {
+            session.token = res.data.token;
+            localStorage.setItem('adminLogin', JSON.stringify(session));
+        }
+        document.getElementById('forcePwdModal').classList.remove('show');
+        showToast('密码修改成功');
+        loadDashboard();
+        requestAnimationFrame(() => Motion.adminEntrance());
+    }
+};
+function submitForcePasswordChange() { changePasswordFlow(forcePwdCfg); }
 
 // ============ 个人主页（只操作当前登录人自己） ============
 function loadProfile() {
@@ -1328,28 +1389,35 @@ function getSelfId() {
     });
 }
 
-function saveProfileName() {
-    const name = document.getElementById('profileNewName').value.trim();
-    if (!name) return showToast('请输入姓名', 'error');
-    getSelfId().then(id => {
+// 通用保存本人字段：getSelfId → PUT /admins/:id → onOk(res)
+function saveSelfField(field, value, onOk) {
+    return getSelfId().then(id => {
         if (!id) return showToast('无法获取账号信息，请重新登录', 'error');
         return apiFetch(`${API_BASE}/admins/${encodeURIComponent(id)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name })
+            body: JSON.stringify({ [field]: value })
         }).then(r => r.json()).then(res => {
             if (!res.success) return showToast(res.message || '修改失败', 'error');
-            const s = getSession() || {};
-            if (res.data && res.data.token) s.token = res.data.token;
-            s.name = name;
-            localStorage.setItem('adminLogin', JSON.stringify(s));
-            document.getElementById('adminNameDisplay').textContent = name;
-            document.getElementById('adminAvatar').textContent = name.charAt(0);
-            document.getElementById('profileName').textContent = name;
-            document.getElementById('profileAvatar').textContent = name.charAt(0);
-            showToast('姓名已更新');
+            onOk(res);
         });
     }).catch(err => showToast('修改失败：' + err.message, 'error'));
+}
+
+function saveProfileName() {
+    const name = document.getElementById('profileNewName').value.trim();
+    if (!name) return showToast('请输入姓名', 'error');
+    return saveSelfField('name', name, res => {
+        const s = getSession() || {};
+        if (res.data && res.data.token) s.token = res.data.token;
+        s.name = name;
+        localStorage.setItem('adminLogin', JSON.stringify(s));
+        document.getElementById('adminNameDisplay').textContent = name;
+        document.getElementById('adminAvatar').textContent = name.charAt(0);
+        document.getElementById('profileName').textContent = name;
+        document.getElementById('profileAvatar').textContent = name.charAt(0);
+        showToast('姓名已更新');
+    });
 }
 
 function saveProfilePhone() {
@@ -1358,43 +1426,25 @@ function saveProfilePhone() {
     if (!phone || phone.length < 4) return showToast('账号至少4位', 'error');
     if (phone === s.phone) return showToast('账号未发生变化', 'error');
     if (!window.confirm('确定修改登录账号吗？修改后旧账号会立即退出登录。')) return;
-    getSelfId().then(id => {
-        if (!id) return showToast('无法获取账号信息，请重新登录', 'error');
-        return apiFetch(`${API_BASE}/admins/${encodeURIComponent(id)}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone })
-        }).then(r => r.json()).then(res => {
-            if (!res.success) return showToast(res.message || '修改失败', 'error');
-            if (res.data && res.data.relogin) {
-                saveRemembered(phone);
-                clearSession();
-                closeSidebar();
-                document.getElementById('forcePwdModal').classList.remove('show');
-                document.getElementById('adminPage').classList.add('hidden');
-                document.getElementById('loginPage').classList.remove('hidden');
-                applyRemembered();
-                showToast('账号已变更，请用新账号登录');
-                return;
-            }
-            showToast('账号已更新');
-        });
-    }).catch(err => showToast('修改失败：' + err.message, 'error'));
+    return saveSelfField('phone', phone, res => {
+        if (res.data && res.data.relogin) {
+            saveRemembered(phone);
+            clearSession();
+            closeSidebar();
+            document.getElementById('forcePwdModal').classList.remove('show');
+            document.getElementById('adminPage').classList.add('hidden');
+            document.getElementById('loginPage').classList.remove('hidden');
+            applyRemembered();
+            showToast('账号已变更，请用新账号登录');
+            return;
+        }
+        showToast('账号已更新');
+    });
 }
 
-function saveProfilePassword() {
-    const oldPassword = document.getElementById('profileOldPwd').value;
-    const newPassword = document.getElementById('profileNewPwd').value;
-    const confirmPwd = document.getElementById('profileConfirmPwd').value;
-    if (!oldPassword) return showToast('请输入原密码', 'error');
-    if (newPassword.length < 8) return showToast('新密码至少8位', 'error');
-    if (newPassword !== confirmPwd) return showToast('两次输入的新密码不一致', 'error');
-    apiFetch(`${API_BASE}/admin/change-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ oldPassword, newPassword })
-    }).then(r => r.json()).then(res => {
-        if (!res.success) return showToast(res.message || '修改失败', 'error');
+const profilePwdCfg = {
+    fields: ['profileOldPwd', 'profileNewPwd', 'profileConfirmPwd'],
+    onOk: res => {
         const s = getSession() || {};
         if (res.data && res.data.token) {
             s.token = res.data.token;
@@ -1405,8 +1455,9 @@ function saveProfilePassword() {
         document.getElementById('profileNewPwd').value = '';
         document.getElementById('profileConfirmPwd').value = '';
         showToast('密码已修改，其他设备登录已失效');
-    }).catch(err => showToast('修改失败：' + err.message, 'error'));
-}
+    }
+};
+function saveProfilePassword() { changePasswordFlow(profilePwdCfg); }
 
 function doLogin() {
     const phone = document.getElementById('loginPhone').value.trim();
@@ -1701,14 +1752,19 @@ function updateTruncHint(hintId, res) {
     }
 }
 
-function loadStudents() {
-    const tbody = document.getElementById('studentTableBody');
-    tbody.innerHTML = skeletonRows(12, 8);
-    apiFetch(`${API_BASE}/students`).then(r => r.json()).then(res => {
-        if (res.success) { allStudents = res.data; loadClassFilterOptions('fStuClass'); loadDataFilterOptions('fStuCompany', allStudents.map(s => s.company), '全部公司'); loadDataFilterOptions('fStuLocation', allStudents.map(s => s.location), '全部地点'); filterStudents(); updateTruncHint('studentsTruncHint', res); }
-        else updateTruncHint('studentsTruncHint', null);
-    }).catch(() => { updateTruncHint('studentsTruncHint', null); tbody.innerHTML = emptyCell(12, 'i-alert', '加载失败', '请检查网络后重试'); });
-}
+const studentsTbl = {
+    tableId: 'studentTableBody', cols: 12, rows: 8,
+    url: () => `${API_BASE}/students`,
+    truncId: 'studentsTruncHint', failHint: '请检查网络后重试',
+    onOk: res => {
+        allStudents = res.data;
+        loadClassFilterOptions('fStuClass');
+        loadDataFilterOptions('fStuCompany', allStudents.map(s => s.company), '全部公司');
+        loadDataFilterOptions('fStuLocation', allStudents.map(s => s.location), '全部地点');
+        filterStudents();
+    }
+};
+function loadStudents() { return loadTable(studentsTbl); }
 
 function renderStudents(students) {
     const tbody = document.getElementById('studentTableBody');
@@ -1716,7 +1772,9 @@ function renderStudents(students) {
         tbody.innerHTML = emptyCell(12, 'i-inbox', '暂无学员数据', '点击右上角「添加学员」或「批量导入」');
         return;
     }
+    rowStore.students = {};
     tbody.innerHTML = students.map(s => {
+        rowStore.students[s._id] = s;
         const courseDatesCount = (s.courseDates && s.courseDates.length > 0) ? s.courseDates.length : 0;
         return `<tr>
             <td><input type="checkbox" class="stu-check" value="${escapeHtml(s._id)}" aria-label="选择 ${escapeHtml(s.name)}"></td>
@@ -1739,45 +1797,28 @@ function renderStudents(students) {
     }).join('');
 }
 
-function filterStudents() {
-    const q = fv('fStuName').toLowerCase();
-    const pin = acState.stu.phone;
-    const idCard = fv('fStuIdCard');
-    const company = fv('fStuCompany').toLowerCase();
-    const cls = fv('fStuClass');
-    const schedule = fv('fStuSchedule').toLowerCase();
-    const location = fv('fStuLocation').toLowerCase();
-    const active = !!(q || pin || idCard || company || cls || schedule || location);
-    const nameHit = s => pin
-        ? s.phone === pin
-        : (!q || (s.name || '').toLowerCase().includes(q) || (s.phone || '').includes(q));
-    const list = allStudents.filter(s =>
-        nameHit(s) &&
-        (!idCard || (s.idCard || '').includes(idCard)) &&
-        (!company || (s.company || '').trim().toLowerCase() === company) &&
-        (!cls || s.className === cls) &&
-        (!schedule || (s.schedule || '').toLowerCase().includes(schedule)) &&
-        (!location || (s.location || '').trim().toLowerCase() === location)
-    );
-    setFilterCount('stuFilterCount', list.length, allStudents.length);
-    if (active && list.length === 0) {
-        document.getElementById('studentTableBody').innerHTML = emptyCell(12, 'i-search', '无匹配的学员', '可减少条件，或点击「重置」恢复全部');
-        return;
+const studentsFilter = makeFilter({
+    acKey: 'stu', nameId: 'fStuName',
+    fieldIds: ['fStuName', 'fStuIdCard', 'fStuCompany', 'fStuClass', 'fStuSchedule', 'fStuLocation'],
+    countId: 'stuFilterCount', tableId: 'studentTableBody',
+    cols: 12, emptyTitle: '无匹配的学员',
+    source: () => allStudents, render: renderStudents, phoneLower: false,
+    match: () => {
+        const idCard = fv('fStuIdCard');
+        const company = fv('fStuCompany').toLowerCase();
+        const cls = fv('fStuClass');
+        const schedule = fv('fStuSchedule').toLowerCase();
+        const location = fv('fStuLocation').toLowerCase();
+        return row => (!idCard || (row.idCard || '').includes(idCard)) &&
+            (!company || (row.company || '').trim().toLowerCase() === company) &&
+            (!cls || row.className === cls) &&
+            (!schedule || (row.schedule || '').toLowerCase().includes(schedule)) &&
+            (!location || (row.location || '').trim().toLowerCase() === location);
     }
-    renderStudents(list);
-}
-
-function resetStuFilterUI() {
-    clearFilter(['fStuName', 'fStuIdCard', 'fStuCompany', 'fStuClass', 'fStuSchedule', 'fStuLocation']);
-    acState.stu.phone = '';
-    acClose('stu');
-    const c = document.getElementById('stuFilterCount');
-    if (c) c.textContent = '';
-}
-function resetStuFilter() {
-    resetStuFilterUI();
-    filterStudents();
-}
+});
+function filterStudents() { studentsFilter.filter(); }
+function resetStuFilterUI() { studentsFilter.resetUI(); }
+function resetStuFilter() { studentsFilter.reset(); }
 
 function toggleCheckAll() {
     const checked = document.getElementById('checkAll').checked;
@@ -1793,7 +1834,7 @@ function showAddStudentModal() {
 }
 
 function editStudent(id) {
-    const s = allStudents.find(x => x._id === id);
+    const s = rowStore.students[id];
     if (!s) return;
     document.getElementById('modalTitle').textContent = '编辑学员';
     document.getElementById('editStudentId').value = id;
@@ -1909,7 +1950,7 @@ function saveStudent() {
 }
 
 function resetPassword(id) {
-    const s = allStudents.find(x => x._id === id);
+    const s = rowStore.students[id];
     const name = s ? s.name : '';
     if (!confirm(`确定要重置学员「${name}」的密码吗？\n重置后密码为身份证后6位（无身份证则为手机号后6位），登录后需重新修改密码。`)) return;
     apiFetch(`${API_BASE}/students/${id}/reset-password`, { method: 'POST' }).then(r => r.json()).then(res => {
@@ -1922,11 +1963,13 @@ function resetPassword(id) {
 }
 
 function deleteStudent(id) {
-    const s = allStudents.find(x => x._id === id);
+    const s = rowStore.students[id];
     const name = s ? s.name : '';
-    if (!confirm(`确定要删除学员「${name}」吗？其登录账户将同步删除，此操作不可恢复。`)) return;
-    apiFetch(`${API_BASE}/students/${id}`, { method: 'DELETE' }).then(r => r.json()).then(res => {
-        if (res.success) { showToast('删除成功'); loadStudents(); } else showToast(res.message, 'error');
+    confirmThen({
+        msg: `确定要删除学员「${name}」吗？其登录账户将同步删除，此操作不可恢复。`,
+        url: `${API_BASE}/students/${id}`,
+        okMsg: '删除成功',
+        reload: loadStudents
     });
 }
 
@@ -1942,92 +1985,101 @@ function batchDeleteStudents() {
 }
 
 // ============ Excel 导入 ============
-// ============ 学员批量导入（模态框） ============
-function showImportModal() {
-    document.getElementById('importResult').innerHTML = '';
-    clearSelectedFile();
-    document.getElementById('studentImportModal').classList.add('show');
-}
-function closeImportModal() { document.getElementById('studentImportModal').classList.remove('show'); }
-
-let selectedFile = null;
-
-const uploadZone = document.getElementById('uploadZone');
-if (uploadZone) {
-    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
-    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
-    uploadZone.addEventListener('drop', e => {
-        e.preventDefault();
-        uploadZone.classList.remove('dragover');
-        if (e.dataTransfer.files.length) handleFileSelected(e.dataTransfer.files[0]);
-    });
-    uploadZone.addEventListener('click', () => document.getElementById('fileInput').click());
-}
-
-function handleFileSelect(e) { if (e.target.files.length) handleFileSelected(e.target.files[0]); }
-
-function handleFileSelected(file) {
-    if (!file.name.match(/\.xlsx?$/i)) return showToast('请选择 Excel 文件（.xlsx 或 .xls）', 'error');
-    selectedFile = file;
-    document.getElementById('selectedFileName').textContent = file.name;
-    document.getElementById('selectedFileSize').textContent = '(' + (file.size / 1024).toFixed(1) + ' KB)';
-    document.getElementById('selectedFileBox').classList.remove('hidden');
-    document.getElementById('importResult').innerHTML = '';
-}
-
-function clearSelectedFile() {
-    selectedFile = null;
-    document.getElementById('selectedFileBox').classList.add('hidden');
-    document.getElementById('fileInput').value = '';
-}
-
-function confirmImport() {
-    if (!selectedFile) return showToast('请先选择文件', 'error');
-    const btn = document.getElementById('confirmImportBtn');
-    btn.disabled = true;
-    btn.textContent = '导入中...';
-
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    document.getElementById('importResult').innerHTML = '<div class="result-box result-info"><span class="result-icon">' + ico('i-clock') + '</span><div>正在导入中，请稍候...</div></div>';
-
-    apiFetch(`${API_BASE}/import`, { method: 'POST', body: formData }).then(r => r.json()).then(res => {
-        btn.disabled = false;
-        btn.textContent = '确认导入';
-        if (res.success) {
-            const d = res.data;
-            let html = `<div class="result-box result-success">
-                <span class="result-icon">${ico('i-check-circle')}</span>
-                <div><strong>导入完成</strong>：共 ${d.total} 条，新增 ${d.added} 条，更新 ${d.updated} 条，失败 ${d.failed} 条</div>
-            </div>`;
-            if (d.errors.length > 0) {
-                html += '<div class="error-list">' + d.errors.map(e => `<div class="error-item">${ico('i-alert','ico-sm')} ${escapeHtml(e)}</div>`).join('') + '</div>';
+// 通用导入控制器：cfg = { modalId, resultId, zoneId, inputId, nameId, sizeId, boxId, btnId, url, fileErr, pendingHtml, successHtml, onDone }
+function makeImportController(cfg) {
+    let file = null;
+    function clear() {
+        file = null;
+        document.getElementById(cfg.boxId).classList.add('hidden');
+        document.getElementById(cfg.inputId).value = '';
+    }
+    function open() {
+        document.getElementById(cfg.resultId).innerHTML = '';
+        clear();
+        document.getElementById(cfg.modalId).classList.add('show');
+    }
+    function close() { document.getElementById(cfg.modalId).classList.remove('show'); }
+    function handleSelect(e) { if (e.target.files.length) handleFile(e.target.files[0]); }
+    function handleFile(f) {
+        if (!f.name.match(/\.xlsx?$/i)) return showToast(cfg.fileErr, 'error');
+        file = f;
+        document.getElementById(cfg.nameId).textContent = f.name;
+        document.getElementById(cfg.sizeId).textContent = '(' + (f.size / 1024).toFixed(1) + ' KB)';
+        document.getElementById(cfg.boxId).classList.remove('hidden');
+        document.getElementById(cfg.resultId).innerHTML = '';
+    }
+    const zone = document.getElementById(cfg.zoneId);
+    if (zone) {
+        zone.addEventListener('click', () => document.getElementById(cfg.inputId).click());
+        zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+        zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+        zone.addEventListener('drop', e => {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+    }
+    function confirmUpload() {
+        if (!file) return showToast('请先选择文件', 'error');
+        const btn = document.getElementById(cfg.btnId);
+        btn.disabled = true;
+        btn.textContent = '导入中...';
+        const formData = new FormData();
+        formData.append('file', file);
+        document.getElementById(cfg.resultId).innerHTML = '<div class="result-box result-info"><span class="result-icon">' + ico('i-clock') + '</span><div>' + cfg.pendingHtml + '</div></div>';
+        apiFetch(cfg.url, { method: 'POST', body: formData }).then(r => r.json()).then(res => {
+            btn.disabled = false;
+            btn.textContent = '确认导入';
+            if (res.success) {
+                document.getElementById(cfg.resultId).innerHTML = cfg.successHtml(res.data);
+                cfg.onDone();
+                clear();
+            } else {
+                document.getElementById(cfg.resultId).innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>${escapeHtml(res.message)}</div></div>`;
             }
-            document.getElementById('importResult').innerHTML = html;
-            loadStudents();
-            selectedFile = null;
-            document.getElementById('selectedFileBox').classList.add('hidden');
-            document.getElementById('fileInput').value = '';
-        } else {
-            document.getElementById('importResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>${escapeHtml(res.message)}</div></div>`;
-        }
-    }).catch(err => {
-        btn.disabled = false;
-        btn.textContent = '确认导入';
-        document.getElementById('importResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>导入失败：${escapeHtml(err.message)}</div></div>`;
-    });
+        }).catch(err => {
+            btn.disabled = false;
+            btn.textContent = '确认导入';
+            document.getElementById(cfg.resultId).innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>导入失败：${escapeHtml(err.message)}</div></div>`;
+        });
+    }
+    return { open, close, clear, handleSelect, confirmUpload };
 }
+
+// ============ 学员批量导入（模态框） ============
+const studentImportCtrl = makeImportController({
+    modalId: 'studentImportModal', resultId: 'importResult',
+    zoneId: 'uploadZone', inputId: 'fileInput',
+    nameId: 'selectedFileName', sizeId: 'selectedFileSize', boxId: 'selectedFileBox',
+    btnId: 'confirmImportBtn', url: `${API_BASE}/import`,
+    fileErr: '请选择 Excel 文件（.xlsx 或 .xls）',
+    pendingHtml: '正在导入中，请稍候...',
+    successHtml: d => {
+        let html = `<div class="result-box result-success">
+            <span class="result-icon">${ico('i-check-circle')}</span>
+            <div><strong>导入完成</strong>：共 ${d.total} 条，新增 ${d.added} 条，更新 ${d.updated} 条，失败 ${d.failed} 条</div>
+        </div>`;
+        if (d.errors.length > 0) {
+            html += '<div class="error-list">' + d.errors.map(e => `<div class="error-item">${ico('i-alert','ico-sm')} ${escapeHtml(e)}</div>`).join('') + '</div>';
+        }
+        return html;
+    },
+    onDone: loadStudents
+});
+function showImportModal() { studentImportCtrl.open(); }
+function closeImportModal() { studentImportCtrl.close(); }
+function handleFileSelect(e) { studentImportCtrl.handleSelect(e); }
+function clearSelectedFile() { studentImportCtrl.clear(); }
+function confirmImport() { studentImportCtrl.confirmUpload(); }
 
 // ============ 入校申请 ============
-function loadRequests() {
-    const tbody = document.getElementById('requestTableBody');
-    tbody.innerHTML = skeletonRows(8, 6);
-    const status = document.getElementById('requestFilter').value;
-    apiFetch(`${API_BASE}/requests?status=${status}`).then(r => r.json()).then(res => {
-        if (res.success) { renderRequests(res.data); updateTruncHint('requestsTruncHint', res); }
-        else updateTruncHint('requestsTruncHint', null);
-    }).catch(() => { updateTruncHint('requestsTruncHint', null); tbody.innerHTML = emptyCell(8, 'i-alert', '加载失败', '请检查网络后重试'); });
-}
+const requestsTbl = {
+    tableId: 'requestTableBody', cols: 8, rows: 6,
+    url: () => `${API_BASE}/requests?status=${document.getElementById('requestFilter').value}`,
+    truncId: 'requestsTruncHint', failHint: '请检查网络后重试',
+    onOk: res => renderRequests(res.data)
+};
+function loadRequests() { return loadTable(requestsTbl); }
 
 function renderRequests(requests) {
     const tbody = document.getElementById('requestTableBody');
@@ -2035,11 +2087,9 @@ function renderRequests(requests) {
         tbody.innerHTML = emptyCell(8, 'i-inbox', '暂无申请数据');
         return;
     }
-    const now = new Date();
     const statusMap = { pending: ['待审核', 'tag-pending'], approved: ['已通过', 'tag-approved'], rejected: ['已拒绝', 'tag-rejected'] };
     tbody.innerHTML = requests.map(r => {
-        const isExpired = r.status === 'approved' &&
-            (!r.entryDate || now > new Date((r.entryDate + ' ' + (r.entryEndTime || '23:59')).replace(/-/g, '/')));
+        const isExpired = !!r.isExpired;
         let statusText, statusClass;
         if (isExpired) { statusText = '已过期'; statusClass = 'tag-expired'; }
         else { [statusText, statusClass] = statusMap[r.status] || ['未知', '']; }
@@ -2089,53 +2139,40 @@ function confirmReject() {
 // ============ 学员账户 ============
 let allAccounts = [];
 
-function loadAccounts() {
-    const tbody = document.getElementById('accountTableBody');
-    tbody.innerHTML = skeletonRows(6, 6);
-    apiFetch(`${API_BASE}/accounts`).then(r => r.json()).then(res => {
-        if (res.success) { allAccounts = res.data; loadClassFilterOptions('fAccClass'); loadDataFilterOptions('fAccCompany', allAccounts.map(a => a.company), '全部公司'); filterAccounts(); updateTruncHint('accountsTruncHint', res); }
-        else updateTruncHint('accountsTruncHint', null);
-    }).catch(() => { updateTruncHint('accountsTruncHint', null); tbody.innerHTML = emptyCell(6, 'i-alert', '加载失败'); });
-}
-
-function filterAccounts() {
-    const q = fv('fAccName').toLowerCase();
-    const pin = acState.acc.phone;
-    const company = fv('fAccCompany').toLowerCase();
-    const cls = fv('fAccClass');
-    const schedule = fv('fAccSchedule').toLowerCase();
-    const created = fv('fAccCreated').toLowerCase();
-    const active = !!(q || pin || company || cls || schedule || created);
-    const fmt = t => (t ? new Date(t).toLocaleString('zh-CN') : '');
-    const nameHit = a => pin
-        ? a.phone === pin
-        : (!q || (a.name || '').toLowerCase().includes(q) || (a.phone || '').includes(q));
-    const list = allAccounts.filter(a =>
-        nameHit(a) &&
-        (!company || (a.company || '').trim().toLowerCase() === company) &&
-        (!cls || a.className === cls) &&
-        (!schedule || (a.schedule || '').toLowerCase().includes(schedule)) &&
-        (!created || (fmt(a.createdAt) + ' ' + (a.createdAt || '')).toLowerCase().includes(created))
-    );
-    setFilterCount('accFilterCount', list.length, allAccounts.length);
-    if (active && list.length === 0) {
-        document.getElementById('accountTableBody').innerHTML = emptyCell(6, 'i-search', '无匹配的账户', '可减少条件，或点击「重置」恢复全部');
-        return;
+const accountsTbl = {
+    tableId: 'accountTableBody', cols: 6, rows: 6,
+    url: () => `${API_BASE}/accounts`,
+    truncId: 'accountsTruncHint',
+    onOk: res => {
+        allAccounts = res.data;
+        loadClassFilterOptions('fAccClass');
+        loadDataFilterOptions('fAccCompany', allAccounts.map(a => a.company), '全部公司');
+        filterAccounts();
     }
-    renderAccounts(list);
-}
+};
+function loadAccounts() { return loadTable(accountsTbl); }
 
-function resetAccFilterUI() {
-    clearFilter(['fAccName', 'fAccCompany', 'fAccClass', 'fAccSchedule', 'fAccCreated']);
-    acState.acc.phone = '';
-    acClose('acc');
-    const c = document.getElementById('accFilterCount');
-    if (c) c.textContent = '';
-}
-function resetAccFilter() {
-    resetAccFilterUI();
-    filterAccounts();
-}
+const accountsFilter = makeFilter({
+    acKey: 'acc', nameId: 'fAccName',
+    fieldIds: ['fAccName', 'fAccCompany', 'fAccClass', 'fAccSchedule', 'fAccCreated'],
+    countId: 'accFilterCount', tableId: 'accountTableBody',
+    cols: 6, emptyTitle: '无匹配的账户',
+    source: () => allAccounts, render: renderAccounts, phoneLower: false,
+    match: () => {
+        const company = fv('fAccCompany').toLowerCase();
+        const cls = fv('fAccClass');
+        const schedule = fv('fAccSchedule').toLowerCase();
+        const created = fv('fAccCreated').toLowerCase();
+        const fmt = t => (t ? new Date(t).toLocaleString('zh-CN') : '');
+        return row => (!company || (row.company || '').trim().toLowerCase() === company) &&
+            (!cls || row.className === cls) &&
+            (!schedule || (row.schedule || '').toLowerCase().includes(schedule)) &&
+            (!created || (fmt(row.createdAt) + ' ' + (row.createdAt || '')).toLowerCase().includes(created));
+    }
+});
+function filterAccounts() { accountsFilter.filter(); }
+function resetAccFilterUI() { accountsFilter.resetUI(); }
+function resetAccFilter() { accountsFilter.reset(); }
 
 function renderAccounts(accounts) {
     const tbody = document.getElementById('accountTableBody');
@@ -2166,47 +2203,33 @@ function syncAccounts() {
 let allAdmins = [];
 const roleMap = { superadmin: '超级管理员', admin: '管理员' };
 
-function loadAdmins() {
-    const tbody = document.getElementById('adminTableBody');
-    tbody.innerHTML = skeletonRows(6, 5);
-    apiFetch(`${API_BASE}/admins`).then(r => r.json()).then(res => {
-        if (res.success) { allAdmins = res.data; loadClassFilterOptions('fAdmClass'); filterAdmins(); }
-    }).catch(() => { tbody.innerHTML = emptyCell(6, 'i-alert', '加载失败'); });
-}
-
-function filterAdmins() {
-    const q = fv('fAdmName').toLowerCase();
-    const pin = acState.adm.phone;
-    const role = fv('fAdmRole');
-    const cls = fv('fAdmClass');
-    const active = !!(q || pin || role || cls);
-    const nameHit = a => pin
-        ? a.phone === pin
-        : (!q || (a.name || '').toLowerCase().includes(q) || (a.phone || '').toLowerCase().includes(q));
-    const list = allAdmins.filter(a =>
-        nameHit(a) &&
-        (!role || a.role === role) &&
-        (!cls || (a.classes || []).includes(cls))
-    );
-    setFilterCount('admFilterCount', list.length, allAdmins.length);
-    if (active && list.length === 0) {
-        document.getElementById('adminTableBody').innerHTML = emptyCell(6, 'i-search', '无匹配的管理员', '可减少条件，或点击「重置」恢复全部');
-        return;
+const adminsTbl = {
+    tableId: 'adminTableBody', cols: 6, rows: 5,
+    url: () => `${API_BASE}/admins`,
+    onOk: res => {
+        allAdmins = res.data;
+        loadClassFilterOptions('fAdmClass');
+        filterAdmins();
     }
-    renderAdmins(list);
-}
+};
+function loadAdmins() { return loadTable(adminsTbl); }
 
-function resetAdmFilterUI() {
-    clearFilter(['fAdmName', 'fAdmRole', 'fAdmClass']);
-    acState.adm.phone = '';
-    acClose('adm');
-    const c = document.getElementById('admFilterCount');
-    if (c) c.textContent = '';
-}
-function resetAdmFilter() {
-    resetAdmFilterUI();
-    filterAdmins();
-}
+const adminsFilter = makeFilter({
+    acKey: 'adm', nameId: 'fAdmName',
+    fieldIds: ['fAdmName', 'fAdmRole', 'fAdmClass'],
+    countId: 'admFilterCount', tableId: 'adminTableBody',
+    cols: 6, emptyTitle: '无匹配的管理员',
+    source: () => allAdmins, render: renderAdmins, phoneLower: true,
+    match: () => {
+        const role = fv('fAdmRole');
+        const cls = fv('fAdmClass');
+        return row => (!role || row.role === role) &&
+            (!cls || (row.classes || []).includes(cls));
+    }
+});
+function filterAdmins() { adminsFilter.filter(); }
+function resetAdmFilterUI() { adminsFilter.resetUI(); }
+function resetAdmFilter() { adminsFilter.reset(); }
 
 function renderAdmins(admins) {
     const tbody = document.getElementById('adminTableBody');
@@ -2319,11 +2342,10 @@ function saveAdmin() {
 function deleteAdmin(id) {
     const a = rowStore.admins[id];
     const name = a ? a.name : '';
-    if (!confirm(`确定要删除管理员"${name}"吗？`)) return;
-    apiFetch(`${API_BASE}/admins/${id}`, {
-        method: 'DELETE'
-    }).then(r => r.json()).then(res => {
-        if (res.success) { showToast(res.message); loadAdmins(); } else showToast(res.message, 'error');
+    confirmThen({
+        msg: `确定要删除管理员"${name}"吗？`,
+        url: `${API_BASE}/admins/${id}`,
+        reload: loadAdmins
     });
 }
 
@@ -2416,13 +2438,12 @@ window.addEventListener('pagehide', () => Motion.destroy());
 window.addEventListener('beforeunload', () => Motion.destroy());
 
 // ============ 温馨提示管理 ============
-function loadTips() {
-    const tbody = document.getElementById('tipTableBody');
-    tbody.innerHTML = skeletonRows(4, 4);
-    apiFetch(`${API_BASE}/tips`).then(r => r.json()).then(res => {
-        if (res.success) renderTips(res.data || []);
-    }).catch(() => { tbody.innerHTML = emptyCell(4, 'i-alert', '加载失败'); });
-}
+const tipsTbl = {
+    tableId: 'tipTableBody', cols: 4, rows: 4,
+    url: () => `${API_BASE}/tips`,
+    onOk: res => renderTips(res.data || [])
+};
+function loadTips() { return loadTable(tipsTbl); }
 
 function renderTips(tips) {
     const tbody = document.getElementById('tipTableBody');
@@ -2495,85 +2516,36 @@ function saveTip() {
 function deleteTip(id) {
     const t = rowStore.tips[id];
     const className = t ? t.className : '';
-    if (!confirm(`确定删除「${className}」的温馨提示？`)) return;
-    apiFetch(`${API_BASE}/tips/${id}`, { method: 'DELETE' }).then(r => r.json()).then(res => {
-        if (res.success) { showToast(res.message); loadTips(); } else showToast(res.message, 'error');
+    confirmThen({
+        msg: `确定删除「${className}」的温馨提示？`,
+        url: `${API_BASE}/tips/${id}`,
+        reload: loadTips
     });
 }
 
 // ============ 管理员批量导入（选中文件后需点「确认导入」才上传） ============
-let adminSelectedFile = null;
-
-function showAdminImportModal() {
-    document.getElementById('adminImportResult').innerHTML = '';
-    clearAdminSelectedFile();
-    document.getElementById('adminImportModal').classList.add('show');
-}
-function closeAdminImportModal() { document.getElementById('adminImportModal').classList.remove('show'); }
-
-const adminUploadZone = document.getElementById('adminUploadZone');
-if (adminUploadZone) {
-    adminUploadZone.addEventListener('click', () => document.getElementById('adminFileInput').click());
-    adminUploadZone.addEventListener('dragover', e => { e.preventDefault(); adminUploadZone.classList.add('dragover'); });
-    adminUploadZone.addEventListener('dragleave', () => adminUploadZone.classList.remove('dragover'));
-    adminUploadZone.addEventListener('drop', e => {
-        e.preventDefault();
-        adminUploadZone.classList.remove('dragover');
-        if (e.dataTransfer.files.length) handleAdminFileSelected(e.dataTransfer.files[0]);
-    });
-}
-
-function handleAdminFileSelect(e) {
-    if (e.target.files.length) handleAdminFileSelected(e.target.files[0]);
-}
-
-function handleAdminFileSelected(file) {
-    if (!file.name.match(/\.xlsx?$/i)) return showToast('请选择 Excel 文件', 'error');
-    adminSelectedFile = file;
-    document.getElementById('adminSelectedFileName').textContent = file.name;
-    document.getElementById('adminSelectedFileSize').textContent = '(' + (file.size / 1024).toFixed(1) + ' KB)';
-    document.getElementById('adminSelectedFileBox').classList.remove('hidden');
-    document.getElementById('adminImportResult').innerHTML = '';
-}
-
-function clearAdminSelectedFile() {
-    adminSelectedFile = null;
-    document.getElementById('adminSelectedFileBox').classList.add('hidden');
-    document.getElementById('adminFileInput').value = '';
-}
-
-function confirmAdminImport() {
-    if (!adminSelectedFile) return showToast('请先选择文件', 'error');
-    const btn = document.getElementById('adminConfirmImportBtn');
-    btn.disabled = true;
-    btn.textContent = '导入中...';
-
-    const formData = new FormData();
-    formData.append('file', adminSelectedFile);
-    document.getElementById('adminImportResult').innerHTML = '<div class="result-box result-info"><span class="result-icon">' + ico('i-clock') + '</span><div>正在导入...</div></div>';
-
-    apiFetch(`${API_BASE}/admins/import`, { method: 'POST', body: formData }).then(r => r.json()).then(res => {
-        btn.disabled = false;
-        btn.textContent = '确认导入';
-        if (res.success) {
-            const d = res.data;
-            let html = `<div class="result-box result-success"><span class="result-icon">${ico('i-check-circle')}</span><div>导入完成：共 ${d.total} 条，成功 ${d.added} 条，失败 ${d.failed} 条</div></div>`;
-            if (d.errors && d.errors.length > 0) {
-                html += '<div class="error-list">' + d.errors.map(e => `<div class="error-item">${ico('i-alert','ico-sm')} ${escapeHtml(e)}</div>`).join('') + '</div>';
-            }
-            html += '<div class="result-box result-info" style="margin-top:8px;"><div>未填密码的账号：账号和密码都为手机号；创建时间已自动生成；对方首次登录时会要求修改密码。</div></div>';
-            document.getElementById('adminImportResult').innerHTML = html;
-            loadAdmins();
-            clearAdminSelectedFile();
-        } else {
-            document.getElementById('adminImportResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>${escapeHtml(res.message)}</div></div>`;
+const adminImportCtrl = makeImportController({
+    modalId: 'adminImportModal', resultId: 'adminImportResult',
+    zoneId: 'adminUploadZone', inputId: 'adminFileInput',
+    nameId: 'adminSelectedFileName', sizeId: 'adminSelectedFileSize', boxId: 'adminSelectedFileBox',
+    btnId: 'adminConfirmImportBtn', url: `${API_BASE}/admins/import`,
+    fileErr: '请选择 Excel 文件',
+    pendingHtml: '正在导入...',
+    successHtml: d => {
+        let html = `<div class="result-box result-success"><span class="result-icon">${ico('i-check-circle')}</span><div>导入完成：共 ${d.total} 条，成功 ${d.added} 条，失败 ${d.failed} 条</div></div>`;
+        if (d.errors && d.errors.length > 0) {
+            html += '<div class="error-list">' + d.errors.map(e => `<div class="error-item">${ico('i-alert','ico-sm')} ${escapeHtml(e)}</div>`).join('') + '</div>';
         }
-    }).catch(err => {
-        btn.disabled = false;
-        btn.textContent = '确认导入';
-        document.getElementById('adminImportResult').innerHTML = `<div class="result-box result-error"><span class="result-icon">${ico('i-x-circle')}</span><div>导入失败：${escapeHtml(err.message)}</div></div>`;
-    });
-}
+        html += '<div class="result-box result-info" style="margin-top:8px;"><div>未填密码的账号：账号和密码都为手机号；创建时间已自动生成；对方首次登录时会要求修改密码。</div></div>';
+        return html;
+    },
+    onDone: loadAdmins
+});
+function showAdminImportModal() { adminImportCtrl.open(); }
+function closeAdminImportModal() { adminImportCtrl.close(); }
+function handleAdminFileSelect(e) { adminImportCtrl.handleSelect(e); }
+function clearAdminSelectedFile() { adminImportCtrl.clear(); }
+function confirmAdminImport() { adminImportCtrl.confirmUpload(); }
 </script>
 </body>
 </html>
