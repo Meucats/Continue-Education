@@ -65,5 +65,13 @@ const refs = [
   if (!fs.existsSync(p)) fail('MISSING LOCAL REF: ' + u);
 });
 
+// 6.5 shared script src 顺序与依赖（R4 硬要求②）：import-tools 必须先于 course-dates（存在性由段6 兜底）
+const sharedSrcs = [...html.matchAll(/<script\s+src="([^"]+)"/g)].map(m => m[1]);
+const iT = sharedSrcs.indexOf('shared/import-tools.js');
+const cd = sharedSrcs.indexOf('shared/course-dates.js');
+if (iT < 0) fail('MISSING shared script src: shared/import-tools.js');
+if (cd < 0) fail('MISSING shared script src: shared/course-dates.js');
+if (iT >= 0 && cd >= 0 && iT > cd) fail('shared script 顺序错误：import-tools(index ' + iT + ') 必须先于 course-dates(index ' + cd + ')');
+
 console.log(ok ? 'ALL OK' : 'FAILED');
 process.exit(ok ? 0 : 1);

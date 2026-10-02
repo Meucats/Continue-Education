@@ -1,5 +1,7 @@
 const { callAdminApi } = require('../../utils/api.js');
 const util = require('../../utils/util.js');
+// R4 单源：排课日期生成（shared 副本由 admin-server scripts/sync-shared.js 复制，course-dates 内部依赖同目录 import-tools）
+const courseDatesUtil = require('../../shared/course-dates.js');
 
 Page({
   data: {
@@ -76,44 +78,7 @@ Page({
       this.setData({ generatedDates: [] });
       return;
     }
-    this.setData({ generatedDates: this.generateCourseDatesMulti(schedule, courseStartDate, courseEndDate) });
-  },
-
-  // 多时间段（逗号分隔）合并生成，预览与保存共用，保证预览=落库
-  generateCourseDatesMulti: function (schedule, startDate, endDate) {
-    const allDates = [];
-    String(schedule || '').split(/[,，]/).map(s => s.trim()).filter(Boolean).forEach(part => {
-      allDates.push(...this.generateCourseDates(part, startDate, endDate));
-    });
-    allDates.sort((a, b) => a.date.localeCompare(b.date));
-    return allDates;
-  },
-
-  // 生成单个时间段的上课日期
-  generateCourseDates: function (schedule, startDate, endDate) {
-    const dayMap = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '日': 0 };
-    let targetDay = -1;
-    for (const [key, val] of Object.entries(dayMap)) {
-      if (schedule.includes(key)) { targetDay = val; break; }
-    }
-    if (targetDay < 0) return [];
-
-    const timeMatch = schedule.match(/(\d{1,2}:\d{2})\s*[-~]\s*(\d{1,2}:\d{2})/);
-    const timeSlot = timeMatch ? timeMatch[0] : schedule;
-
-    const dates = [];
-    const start = new Date(startDate.replace(/-/g, '/'));
-    const end = new Date(endDate.replace(/-/g, '/'));
-    const d = new Date(start);
-    while (d.getDay() !== targetDay && d <= end) d.setDate(d.getDate() + 1);
-    while (d <= end) {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      dates.push({ date: `${y}-${m}-${day}`, timeSlot });
-      d.setDate(d.getDate() + 7);
-    }
-    return dates;
+    this.setData({ generatedDates: courseDatesUtil.generateCourseDatesMulti(schedule, courseStartDate, courseEndDate) });
   },
 
   onSubmit: function () {
@@ -136,7 +101,7 @@ Page({
 
     this.setData({ submitting: true });
 
-    const courseDates = this.generateCourseDatesMulti(formData.schedule, formData.courseStartDate, formData.courseEndDate);
+    const courseDates = courseDatesUtil.generateCourseDatesMulti(formData.schedule, formData.courseStartDate, formData.courseEndDate);
 
     const data = {
       name: formData.name.trim(),

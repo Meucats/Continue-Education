@@ -4,9 +4,11 @@ const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');              // webadmin/admin-server
 const SRC = path.join(ROOT, 'shared');                // 权威源
-// 消费端目标（相对本脚本换算）：R3 = adminApi 云函数；R4（commit2b）增补 public/ 与 miniprogram 目标
+// 消费端目标（相对本脚本换算）：R3 = adminApi 云函数；R4 增补 public（index.html script src）与 miniprogram（admin-add require）
 const TARGETS = [
-  path.join(ROOT, '..', '..', 'wxminiprogram', 'cloudfunctions', 'adminApi', 'shared')
+  path.join(ROOT, '..', '..', 'wxminiprogram', 'cloudfunctions', 'adminApi', 'shared'),
+  path.join(ROOT, 'public', 'shared'),
+  path.join(ROOT, '..', '..', 'wxminiprogram', 'miniprogram', 'shared')
 ];
 let n = 0;
 for (const dir of TARGETS) {

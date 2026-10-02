@@ -3,6 +3,8 @@ const XLSX = require('xlsx');
 const crypto = require('crypto');
 // R3 单源：shared/import-tools.js 为权威源（webadmin/admin-server/shared/），本目录副本由 sync-shared.js 复制
 const { detectFieldMapping, getField, asStr, parseExcelDate, formatDateStr } = require('./shared/import-tools');
+// R4 单源：shared/course-dates.js（依赖 import-tools，course-dates 内部 require 同目录 import-tools）
+const { generateCourseDates, generateCourseDatesMulti } = require('./shared/course-dates');
 cloud.init({ env: 'cloud1-d6gio7v8iff39bab7' });
 const db = cloud.database();
 const _ = db.command;
@@ -200,44 +202,7 @@ async function classNamesAggregate() {
   }
 }
 
-// ====== 排课日期生成（addStudent/updateStudent/importStudents/repairCourseDates 共用）======
-// parseExcelDate/formatDateStr 来自 shared/import-tools（单源，见文件头 require）；generateCourseDates/Multi 仍在本文件模块级（R4 待收敛）
-
-// 根据上课时间段+开始结束日期，自动生成具体上课日期（单个时间段）
-function generateCourseDates(schedule, startDate, endDate) {
-  if (!schedule || !startDate || !endDate) return [];
-  const dayMap = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '日': 0 };
-  let targetDay = -1;
-  for (const [key, val] of Object.entries(dayMap)) {
-    if (schedule.includes(key)) { targetDay = val; break; }
-  }
-  if (targetDay < 0) return [];
-  const timeMatch = schedule.match(/(\d{1,2}:\d{2})\s*[-~]\s*(\d{1,2}:\d{2})/);
-  const timeSlot = timeMatch ? timeMatch[0] : schedule;
-  const start = parseExcelDate(startDate);
-  const end = parseExcelDate(endDate);
-  if (!start || !end) return [];
-  const dates = [];
-  const d = new Date(start);
-  while (d.getDay() !== targetDay && d <= end) d.setDate(d.getDate() + 1);
-  while (d <= end) {
-    dates.push({ date: formatDateStr(d), timeSlot });
-    d.setDate(d.getDate() + 7);
-  }
-  return dates;
-}
-
-// 支持逗号分隔的多时间段
-function generateCourseDatesMulti(schedule, startDate, endDate) {
-  const allDates = [];
-  const parts = String(schedule || '').split(/[,，]/).map(s => s.trim()).filter(Boolean);
-  parts.forEach(part => {
-    const dates = generateCourseDates(part, startDate, endDate);
-    allDates.push(...dates);
-  });
-  allDates.sort((a, b) => a.date.localeCompare(b.date));
-  return allDates;
-}
+// 排课日期生成 generateCourseDates/Multi 已收敛至 shared/course-dates（R4 单源，文件头 require）
 
 exports.main = async (event, context) => {
   const { action, data, id, status, reason, keyword, token, secret } = event;

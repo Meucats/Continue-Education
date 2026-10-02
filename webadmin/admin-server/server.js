@@ -8,6 +8,8 @@ const https = require('https');
 const crypto = require('crypto');
 // R3 单源：学生导入工具（表头映射/取值/字符串化/Excel日期解析/日期格式化）——权威源 shared/import-tools.js（UMD）
 const { detectFieldMapping, getField, asStr, parseExcelDate, formatDateStr } = require('./shared/import-tools');
+// R4 单源：排课日期生成（单段+多段）——权威源 shared/course-dates.js（UMD，依赖 import-tools 由其内部注入）
+const { generateCourseDates, generateCourseDatesMulti } = require('./shared/course-dates');
 
 // 读取配置
 const configPath = path.join(__dirname, 'config.json');
@@ -467,47 +469,6 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
     if (req.file) { try { fs.unlinkSync(req.file.path); } catch (e) {} }
   }
 });
-
-// 根据上课时间段+开始结束日期，自动生成具体上课日期（单个时间段）
-function generateCourseDates(schedule, startDate, endDate) {
-  if (!startDate || !endDate) return [];
-  const dayMap = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '日': 0 };
-  let targetDay = -1;
-  for (const [key, val] of Object.entries(dayMap)) {
-    if (schedule.includes(key)) { targetDay = val; break; }
-  }
-  if (targetDay < 0) return [];
-
-  const timeMatch = schedule.match(/(\d{1,2}:\d{2})\s*[-~]\s*(\d{1,2}:\d{2})/);
-  const timeSlot = timeMatch ? timeMatch[0] : schedule;
-
-  const start = parseExcelDate(startDate);
-  const end = parseExcelDate(endDate);
-  if (!start || !end) return [];
-
-  const dates = [];
-  const d = new Date(start);
-  while (d.getDay() !== targetDay && d <= end) {
-    d.setDate(d.getDate() + 1);
-  }
-  while (d <= end) {
-    dates.push({ date: formatDateStr(d), timeSlot: timeSlot });
-    d.setDate(d.getDate() + 7);
-  }
-  return dates;
-}
-
-// 支持逗号分隔的多时间段
-function generateCourseDatesMulti(schedule, startDate, endDate) {
-  const allDates = [];
-  const parts = schedule.split(/[,，]/).map(s => s.trim()).filter(Boolean);
-  parts.forEach(part => {
-    const dates = generateCourseDates(part, startDate, endDate);
-    allDates.push(...dates);
-  });
-  allDates.sort((a, b) => a.date.localeCompare(b.date));
-  return allDates;
-}
 
 // ====== 入校申请 ======
 app.get('/api/requests', ...proxy('getRequests', req => ({ status: req.query.status, ...actorParams(req) })));
