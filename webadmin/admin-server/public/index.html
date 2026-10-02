@@ -1137,7 +1137,10 @@ function loadTable(cfg) {
         if (res.success) {
             cfg.onOk(res);
             if (cfg.truncId) updateTruncHint(cfg.truncId, res);
-        } else if (cfg.truncId) updateTruncHint(cfg.truncId, null);
+        } else {
+            if (cfg.truncId) updateTruncHint(cfg.truncId, null);
+            tbody.innerHTML = emptyCell(cfg.cols, 'i-alert', '加载失败', res.message);
+        }
     }).catch(() => {
         if (cfg.truncId) updateTruncHint(cfg.truncId, null);
         tbody.innerHTML = emptyCell(cfg.cols, 'i-alert', '加载失败', cfg.failHint);
@@ -2075,7 +2078,7 @@ function confirmImport() { studentImportCtrl.confirmUpload(); }
 // ============ 入校申请 ============
 const requestsTbl = {
     tableId: 'requestTableBody', cols: 8, rows: 6,
-    url: () => `${API_BASE}/requests?status=${document.getElementById('requestFilter').value}`,
+    url: () => `${API_BASE}/requests?status=${document.getElementById('requestFilter')?.value || ''}`,
     truncId: 'requestsTruncHint', failHint: '请检查网络后重试',
     onOk: res => renderRequests(res.data)
 };
