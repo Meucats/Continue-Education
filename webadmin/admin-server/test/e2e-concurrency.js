@@ -55,15 +55,12 @@ const show = d => `success:true×${d.t} / success:false×${d.f}；样本：${d.s
   console.log('    创建分布：' + show(d1));
   r = await req('GET', '/admins', null, S);
   const dups = ((r.json && r.json.data) || []).filter(a => a.phone === dupPhone);
-  // 观察项（2026-10-02 自硬断言降级，不计 pass/fail）：已知缺口：addAdmin 缺唯一约束（台账项）；
-  // check-then-insert 竞态下并发可建成 N 条（顺序创建有 app 查重「该账号已存在」，云侧无唯一约束；
-  // 触发需超管令牌+脚本并发，UI 顺序操作不可达，不阻塞本任务）。
-  // 修复拟并入 W4 adminApi 波（改 addAdmin 加唯一约束、随云函数一次性重传），业务修复后恢复为恰1条硬断言。
-  if (dups.length === 1) {
-    console.log('  WARN 用例1b 并发建成 1 条（当前满足期望；仍为观察项，业务修复后转硬断言）');
-  } else {
-    console.log('  WARN 用例1b 并发建成 ' + dups.length + ' 条（已知缺口：addAdmin 缺唯一约束（台账项）；业务修复后恢复为恰1条硬断言）');
-  }
+  // 硬断言（2026-10-03 恢复，替代 2026-10-02 的观察项降级）：W4-1b 已在 adminApi 落
+  // addAdmin/updateAdmin/updateStudent 三处重复键 catch（isDupKeyErr：-502001/E11000 → 业务文案，
+  // 其余 rethrow）+ update 双端查重预检，随云函数一次性重传；云端 ping 探针实证
+  // BUILD='2026-10-02-AtoE+W4' 与本地字面量逐字一致（部署生效）。并发 check-then-insert 竞态
+  // 由唯一键 catch 兜底（依赖 admins.phone 唯一索引在位）→ 并发创建同 phone 恰建成 1 条。
+  ok('用例1b 并发恰建成 1 条', dups.length === 1, '建成=' + dups.length);
   // 清理：删掉全部同 phone 条目（含冲突场景多建的）
   for (const a of dups) {
     const cr = await req('DELETE', '/admins/' + encodeURIComponent(a._id), null, S);
