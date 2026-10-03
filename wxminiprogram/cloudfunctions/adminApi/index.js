@@ -15,9 +15,11 @@ const $ = db.command.aggregate;
 // 小程序端调用 admin 需携带 loginAdmin 签发的 token
 const SERVER_SECRET = process.env.ADMIN_API_SECRET || '';
 const TOKEN_TTL = 7 * 24 * 60 * 60 * 1000;
+// 部署版本标识：ping 探针返回（真源=本字面量；每批次部署同步改串，部署后 ping 返回同串即实证）
+const BUILD = '2026-10-02-AtoE+W4';
 
-// 免鉴权 action（登录/学员自助）
-const PUBLIC_ACTIONS = new Set(['loginAdmin', 'loginStudent', 'changePassword', 'getTips', 'addRequest']);
+// 免鉴权 action（登录/学员自助/部署探针）
+const PUBLIC_ACTIONS = new Set(['loginAdmin', 'loginStudent', 'changePassword', 'getTips', 'addRequest', 'ping']);
 // 登录前可调用（必须验证原密码，且有限速）
 const PRELOGIN_ACTIONS = new Set(['changeAdminPassword']);
 // 学员会话可访问的 action
@@ -218,6 +220,15 @@ async function createDefaultAdminDoc() {
   });
 }
 
+// 并发竞态兜底：唯一键冲突（云 DB errCode -502001 / MongoDB E11000）→ 业务文案；其余错误原样抛出
+function isDupKeyErr(e) {
+  if (!e) return false;
+  const code = e.errCode !== undefined ? e.errCode : e.code;
+  if (code === -502001 || String(code) === 'E11000') return true;
+  const msg = String(e.errMsg || e.message || '');
+  return msg.indexOf('E11000') >= 0 || msg.indexOf('-502001') >= 0;
+}
+
 exports.main = async (event, context) => {
   const { action, data, id, status, reason, keyword, token, secret } = event;
 
@@ -252,6 +263,11 @@ exports.main = async (event, context) => {
   }
 
   const HANDLERS = {
+    // ====== 部署探针（免鉴权）：返回 BUILD 串实证云端部署版本，改串重部署即换串 ======
+    ping: async (ctx) => {
+      return { success: true, build: BUILD, serverTime: new Date().toISOString() };
+    },
+
     // ====== 学员管理 ======
     getStudents: async (ctx) => {
       const { event, data, keyword, session } = ctx;
@@ -310,6 +326,11 @@ exports.main = async (event, context) => {
       const { data } = ctx;
       const { _id, name, phone, className, schedule, deadline, location, courseDates, courseStartDate, courseEndDate, idCard, company } = data;
       if (!_id) return { success: false, message: '缺少学员ID' };
+      // 手机号查重预检（改号冲突写入前拦截；竞态由唯一键 catch 兜底）
+      if (phone !== undefined && phone) {
+        const dup = await db.collection('students').where({ phone }).get();
+        if (dup.data.some(d => d._id !== _id)) return { success: false, message: '该手机号已被其他学员使用' };
+      }
       // 落库前统一按 schedule+课程起止日期重算（多时段）；三要素不全时才用客户端传值兜底
       const calcDates = (schedule && courseStartDate && courseEndDate)
         ? generateCourseDatesMulti(schedule, courseStartDate, courseEndDate)
@@ -317,7 +338,12 @@ exports.main = async (event, context) => {
       const updateData = { name, phone, className, schedule, deadline: deadline || '', location, courseDates: calcDates, courseStartDate: courseStartDate || '', courseEndDate: courseEndDate || '', updatedAt: new Date() };
       if (idCard !== undefined) updateData.idCard = idCard;
       if (company !== undefined) updateData.company = company;
-      await db.collection('students').doc(_id).update({ data: updateData });
+      try {
+        await db.collection('students').doc(_id).update({ data: updateData });
+      } catch (e) {
+        if (isDupKeyErr(e)) return { success: false, message: '该手机号已被其他学员使用' };
+        throw e;
+      }
       return { success: true, message: '学员信息已更新' };
     },
 
@@ -826,9 +852,14 @@ exports.main = async (event, context) => {
       const exists = await db.collection('admins').where({ phone: aPhone2 }).get();
       if (exists.data.length > 0) return { success: false, message: '该账号已存在' };
       // 未填密码时：账号=手机号，密码=手机号；由超管创建 → 首次登录强制改密
-      await db.collection('admins').add({
-        data: { name: aName, phone: aPhone2, password: hashPassword(String(aPwd2 || '').trim() || aPhone2), role: role || 'admin', classes: aClasses || [], mustChangePassword: true, createdAt: new Date() }
-      });
+      try {
+        await db.collection('admins').add({
+          data: { name: aName, phone: aPhone2, password: hashPassword(String(aPwd2 || '').trim() || aPhone2), role: role || 'admin', classes: aClasses || [], mustChangePassword: true, createdAt: new Date() }
+        });
+      } catch (e) {
+        if (isDupKeyErr(e)) return { success: false, message: '该账号已存在' };
+        throw e;
+      }
       return { success: true, message: '添加成功' };
     },
 
@@ -840,6 +871,11 @@ exports.main = async (event, context) => {
       try { const d = await db.collection('admins').doc(_id).get(); oldDoc = d.data || null; } catch (e) { oldDoc = null; }
       if (!oldDoc) return { success: false, message: '管理员不存在' };
       const oldPhone = oldDoc.phone;
+      // 手机号查重预检（改号冲突写入前拦截；竞态由唯一键 catch 兜底）
+      if (uPhone !== undefined) {
+        const dup = await db.collection('admins').where({ phone: uPhone }).get();
+        if (dup.data.some(d => d._id !== _id)) return { success: false, message: '该账号已存在' };
+      }
       // 局部更新：未传的字段绝不写（否则 `uRole || 'admin'` 会把超管静默降权）
       const updateData = {};
       if (uName !== undefined) updateData.name = uName;
@@ -851,7 +887,12 @@ exports.main = async (event, context) => {
         // 超管下发的是临时密码 → 对方下次登录需改密（默认账号 admin 会被强制，其余超管豁免）
         updateData.mustChangePassword = true;
       }
-      await db.collection('admins').doc(_id).update({ data: updateData });
+      try {
+        await db.collection('admins').doc(_id).update({ data: updateData });
+      } catch (e) {
+        if (isDupKeyErr(e)) return { success: false, message: '该账号已存在' };
+        throw e;
+      }
       const phoneChanged = !!(uPhone && oldPhone && uPhone !== oldPhone);
       if (uPwd || phoneChanged) {
         // 必须吊销【旧手机号】会话：改号时旧号下的会话全部失效，改密时同号即旧号
