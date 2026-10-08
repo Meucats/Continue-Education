@@ -4,13 +4,28 @@ const { callAdminApi } = require('../../utils/api.js');
 Page({
   data: {
     students: [],
-    allStudents: [],
     searchKey: ''
   },
+  allStudents: [], // 全量源放实例字段，避免与 students 双份 setData 序列化
 
   onShow: function () {
     if (!util.ensureAdmin()) return;
     this.loadStudents();
+  },
+
+  applySearch: function (list) {
+    const key = this.data.searchKey.trim().toLowerCase();
+    if (!key) return list;
+    // 字段统一转字符串再匹配：脏数据缺字段时过滤不能抛 TypeError 中断渲染（二轮审查）
+    return list.filter(item => {
+      const name = String(item.name || '').toLowerCase();
+      const phone = String(item.phone || '');
+      const className = String(item.className || '').toLowerCase();
+      const idCard = String(item.idCard || '');
+      const company = String(item.company || '').toLowerCase();
+      return name.includes(key) || phone.includes(key) ||
+        className.includes(key) || idCard.includes(key) || company.includes(key);
+    });
   },
 
   loadStudents: function () {
@@ -21,13 +36,15 @@ Page({
         ...item,
         expired: util.isCourseExpired(item.deadline, item.courseEndDate)
       }));
-      this.setData({
-        students: students,
-        allStudents: students
-      });
+      this.allStudents = students;
+      // 返回后重载也按当前搜索词过滤，避免「输入框有词但列表是全量」的失效错觉
+      this.setData({ students: this.applySearch(students) });
+      if (res.truncated) {
+        wx.showToast({ title: '数据已截断：仅显示前 ' + students.length + ' 条' + (res.total ? '（共 ' + res.total + ' 条）' : ''), icon: 'none', duration: 2500 });
+      }
     }).catch(err => {
       wx.hideLoading();
-      wx.showToast({ title: '加载失败', icon: 'none' });
+      if (!err || err.code !== 'UNAUTHORIZED') wx.showToast({ title: '加载失败', icon: 'none' });
       console.error(err);
     });
   },
@@ -35,24 +52,12 @@ Page({
   onSearchInput: function (e) {
     this.setData({ searchKey: e.detail.value });
     if (!e.detail.value) {
-      this.setData({ students: this.data.allStudents });
+      this.setData({ students: this.allStudents });
     }
   },
 
   onSearch: function () {
-    const key = this.data.searchKey.trim().toLowerCase();
-    if (!key) {
-      this.setData({ students: this.data.allStudents });
-      return;
-    }
-    const filtered = this.data.allStudents.filter(item =>
-      item.name.toLowerCase().includes(key) ||
-      item.phone.includes(key) ||
-      (item.className && item.className.toLowerCase().includes(key)) ||
-      (item.idCard && item.idCard.includes(key)) ||
-      (item.company && item.company.toLowerCase().includes(key))
-    );
-    this.setData({ students: filtered });
+    this.setData({ students: this.applySearch(this.allStudents) });
   },
 
   onEdit: function (e) {
@@ -81,7 +86,7 @@ Page({
             }
           }).catch(err => {
             wx.hideLoading();
-            wx.showToast({ title: '重置失败', icon: 'none' });
+            if (!err || err.code !== 'UNAUTHORIZED') wx.showToast({ title: '重置失败', icon: 'none' });
             console.error(err);
           });
         }
@@ -98,13 +103,18 @@ Page({
       success: (res) => {
         if (res.confirm) {
           wx.showLoading({ title: '删除中...' });
-          callAdminApi('deleteStudent', null, { id: id }).then(() => {
+          callAdminApi('deleteStudent', null, { id: id }).then(res => {
             wx.hideLoading();
-            wx.showToast({ title: '删除成功', icon: 'success' });
-            this.loadStudents();
+            if (res && res.success) {
+              wx.showToast({ title: res.message || '删除成功', icon: 'success' });
+              // 延迟重载：loadStudents 的 showLoading 会顶掉刚弹的成功 toast（二轮审查）
+              setTimeout(() => this.loadStudents(), 1500);
+            } else {
+              wx.showToast({ title: (res && res.message) || '删除失败', icon: 'none' });
+            }
           }).catch(err => {
             wx.hideLoading();
-            wx.showToast({ title: '删除失败', icon: 'none' });
+            if (!err || err.code !== 'UNAUTHORIZED') wx.showToast({ title: '删除失败', icon: 'none' });
             console.error(err);
           });
         }

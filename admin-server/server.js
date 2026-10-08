@@ -19,9 +19,19 @@ if (fs.existsSync(configPath)) {
 }
 
 const app = express();
+// 反向代理后取真实客户端 IP（影响边缘登录限速 key）：在 config.json 配 "trustProxy": true/网段 后生效
+if (config.trustProxy) app.set('trust proxy', config.trustProxy);
 // CORS：默认不下发跨域头（页面与接口同源，跨域请求由浏览器拦截）；如需放开，在 config.json 配 corsOrigins
 const corsOrigins = Array.isArray(config.corsOrigins) ? config.corsOrigins : [];
 app.use(cors(corsOrigins.length ? { origin: corsOrigins } : { origin: false }));
+// 基础安全响应头（nosniff/防内嵌/不外泄来源/限 frame 与 base 劫持）
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'same-origin');
+  res.setHeader('Content-Security-Policy', "frame-ancestors 'none'; object-src 'none'; base-uri 'self'");
+  next();
+});
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -401,13 +411,13 @@ app.post('/api/admins/init', ...proxy('initDefaultAdmin', () => ({}), [requireSu
 // ====== 学员管理 ======
 app.get('/api/students', ...proxy('getStudents', req => ({ keyword: req.query.keyword, ...actorParams(req) })));
 
-app.post('/api/students', ...proxy('addStudent', req => ({ data: req.body })));
+app.post('/api/students', ...proxy('addStudent', req => ({ data: req.body, ...actorParams(req) })));
 
-app.put('/api/students/:id', ...proxy('updateStudent', req => ({ data: { _id: req.params.id, ...req.body } })));
+app.put('/api/students/:id', ...proxy('updateStudent', req => ({ data: { ...req.body, _id: req.params.id }, ...actorParams(req) })));
 
-app.delete('/api/students/:id', ...proxy('deleteStudent', req => ({ id: req.params.id })));
+app.delete('/api/students/:id', ...proxy('deleteStudent', req => ({ id: req.params.id, ...actorParams(req) })));
 
-app.post('/api/students/batch-delete', ...proxy('batchDeleteStudents', req => ({ data: req.body })));
+app.post('/api/students/batch-delete', ...proxy('batchDeleteStudents', req => ({ data: req.body, ...actorParams(req) })));
 
 // ====== Excel 导入 ======
 app.post('/api/import', upload.single('file'), async (req, res) => {
@@ -422,6 +432,7 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
 
     let added = 0, updated = 0, failed = 0;
     const errors = [];
+    const actor = actorParams(req); // 班级域（H1）：导入行同样受操作者班级约束
 
     for (let i = 0; i < jsonData.length; i++) {
       const row = jsonData[i];
@@ -454,7 +465,13 @@ app.post('/api/import', upload.single('file'), async (req, res) => {
         const endStr = formatDateStr(endD) || String(courseEndDate || '');
 
         const studentData = { name, phone, idCard: idCard || '', company: company || '', className, schedule, deadline: formatDateStr(parseExcelDate(deadline)) || endStr || '', location, courseDates, courseStartDate: startStr, courseEndDate: endStr };
-        const result = await callCloudFunction('addStudent', { data: studentData });
+        const result = await callCloudFunction('addStudent', { data: studentData, ...actor });
+        // 业务失败（跨班拒绝/唯一键/顶层兜底）计入 failed，不再落进 added（二轮审查M2 回归）
+        if (!result || !result.success) {
+          errors.push(`第${rowNum}行：${(result && result.message) || '导入失败'}`);
+          failed++;
+          continue;
+        }
         if (result.message && result.message.includes('更新')) updated++; else added++;
       } catch (err) {
         errors.push(`第${rowNum}行：${err.message}`);
@@ -475,16 +492,16 @@ app.get('/api/requests', ...proxy('getRequests', req => ({ status: req.query.sta
 
 app.post('/api/requests', ...proxy('addRequest', req => ({ data: req.body })));
 
-app.post('/api/requests/:id/approve', ...proxy('approveRequest', req => ({ id: req.params.id })));
+app.post('/api/requests/:id/approve', ...proxy('approveRequest', req => ({ id: req.params.id, ...actorParams(req) })));
 
-app.post('/api/requests/:id/reject', ...proxy('rejectRequest', req => ({ id: req.params.id, reason: req.body.reason })));
+app.post('/api/requests/:id/reject', ...proxy('rejectRequest', req => ({ id: req.params.id, reason: req.body.reason, ...actorParams(req) })));
 
 // ====== 账户管理 ======
-app.post('/api/students/:id/reset-password', ...proxy('resetPassword', req => ({ id: req.params.id })));
+app.post('/api/students/:id/reset-password', ...proxy('resetPassword', req => ({ id: req.params.id, ...actorParams(req) })));
 
 app.get('/api/accounts', ...proxy('getAccounts', req => actorParams(req)));
 
-app.post('/api/accounts/sync', ...proxy('syncAccounts', () => ({})));
+app.post('/api/accounts/sync', ...proxy('syncAccounts', req => actorParams(req)));
 
 // ====== 统计 ======
 app.get('/api/stats/detail', ...proxy('getStats', req => actorParams(req)));
@@ -541,17 +558,17 @@ app.get('/api/template/admins', (req, res) => {
   sendXlsx(res, { rows, cols: [{ wch: 12 }, { wch: 16 }, { wch: 40 }], sheetName: '管理员', disposition: 'attachment; filename=admins.xlsx' });
 });
 
-app.get('/api/tips', ...proxy('getAllTips', () => ({})));
+app.get('/api/tips', ...proxy('getAllTips', req => actorParams(req)));
 
-app.post('/api/tips', ...proxy('updateTip', req => ({ data: req.body })));
+app.post('/api/tips', ...proxy('updateTip', req => ({ data: req.body, ...actorParams(req) })));
 
-app.delete('/api/tips/:id', ...proxy('deleteTip', req => ({ data: { id: req.params.id } })));
+app.delete('/api/tips/:id', ...proxy('deleteTip', req => ({ data: { id: req.params.id }, ...actorParams(req) })));
 
 // ====== 班级列表 ======
 app.get('/api/classes', ...proxy('getClasses', req => actorParams(req)));
 
-// ====== 管理员批量导入 ======
-app.post('/api/admins/import', upload.single('file'), async (req, res) => {
+// ====== 管理员批量导入（二轮审查H1：与 addAdmin/deleteAdmin 同权，须超管；传 actor 供云端二次校验）======
+app.post('/api/admins/import', upload.single('file'), requireSuperadmin, async (req, res) => {
   try {
     if (!req.file) return res.json({ success: false, message: '请上传文件' });
     const workbook = XLSX.readFile(req.file.path);
@@ -576,7 +593,7 @@ app.post('/api/admins/import', upload.single('file'), async (req, res) => {
         classes: fieldMap.classes !== undefined ? String(row[keys[fieldMap.classes]] || '').split(/[,，]/).map(s => s.trim()).filter(Boolean) : []
       };
     });
-    const result = await callCloudFunction('importAdmins', { data: { admins } });
+    const result = await callCloudFunction('importAdmins', { data: { admins }, ...actorParams(req) });
     res.json(result);
   } catch (err) {
     res.json({ success: false, message: err.message });
@@ -590,7 +607,7 @@ const PORT = 3000;
 app.listen(PORT, async () => {
   console.log('');
   console.log('==========================================');
-  console.log('  杭职大继续教育学院 - 管理后台');
+  console.log('  杭职大继续教育培训服务管理系统 - 管理后台');
   console.log('==========================================');
   console.log('');
   console.log('  打开浏览器访问: http://localhost:' + PORT);

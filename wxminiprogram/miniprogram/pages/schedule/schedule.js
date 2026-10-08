@@ -46,7 +46,7 @@ Page({
     fetchRequestWarm().then(isWarm => {
       this.setData({ isWarm: isWarm });
       util.setWarmNavColor(isWarm);
-    }).catch(() => {});
+    }).catch(err => { console.error('loadWarmStatus error:', err); });
   },
 
   goToLogin: function () {
@@ -104,6 +104,7 @@ Page({
       this.filterWeekCourses();
     }).catch(err => {
       console.error('加载课程失败', err);
+      if (!err || err.code !== 'UNAUTHORIZED') wx.showToast({ title: '课程加载失败，请重试', icon: 'none' });
     });
   },
 

@@ -1,7 +1,7 @@
 const cloud = require('wx-server-sdk');
 const xlsx = require('xlsx');
 
-cloud.init({ env: 'cloud1-d6gio7v8iff39bab7' });
+cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 exports.main = async (event, context) => {
   try {

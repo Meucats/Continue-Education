@@ -26,7 +26,7 @@ Page({
     wx.cloud.callFunction({
       name: 'getExcelTemplate'
     }).then(res => {
-      if (res.result.success) {
+      if (res && res.result && res.result.success) {
         const fileID = res.result.fileID;
         wx.cloud.downloadFile({
           fileID: fileID,

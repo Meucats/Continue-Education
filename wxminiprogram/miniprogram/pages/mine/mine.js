@@ -27,7 +27,7 @@ Page({
     fetchRequestWarm().then(isWarm => {
       this.setData({ isWarm: isWarm });
       util.setWarmNavColor(isWarm);
-    }).catch(() => {});
+    }).catch(err => { console.error('loadWarmStatus error:', err); });
   },
 
   loadIdCard: function (phone) {
@@ -36,7 +36,7 @@ Page({
         const masked = this.maskIdCard(res.data.idCard);
         this.setData({ maskedIdCard: masked });
       }
-    }).catch(() => {});
+    }).catch(err => { console.error('loadIdCard error:', err); });
   },
 
   maskIdCard: function (idCard) {

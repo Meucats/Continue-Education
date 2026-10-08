@@ -10,8 +10,8 @@ const path = require('path');
 
 const SHARED = path.join(__dirname, '..', 'shared', 'import-tools.js');
 const SERVER = path.join(__dirname, '..', 'server.js');
-const CLOUD = path.join(__dirname, '..', '..', '..', 'wxminiprogram', 'cloudfunctions', 'adminApi', 'index.js');
-const CLOUD_SHARED = path.join(__dirname, '..', '..', '..', 'wxminiprogram', 'cloudfunctions', 'adminApi', 'shared', 'import-tools.js');
+const CLOUD = path.join(__dirname, '..', '..', 'wxminiprogram', 'cloudfunctions', 'adminApi', 'index.js');
+const CLOUD_SHARED = path.join(__dirname, '..', '..', 'wxminiprogram', 'cloudfunctions', 'adminApi', 'shared', 'import-tools.js');
 
 const failures = [];
 

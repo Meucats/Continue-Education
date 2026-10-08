@@ -2,12 +2,12 @@
 // 1) HANDLERS 名单 = 重构前 37 个 case + 1b 新增 ping（共 38，顺序一致、无重复）
 // 2) 鉴权四集合逐字不变（仅 PUBLIC_ACTIONS 增 'ping'，为计划内变更）
 // 3) 调用方鉴权块逐字不变
-// 4) 未知 action 兜底（原 default）与分发逐字
+// 4) 未知 action 兜底（原 default）与分发逐字（2026-10 复审：分发外扩顶层 try/catch 为计划内变更，基线已同步）
 // 5) switch(action) 已移除、default 标签清零
 // 6) BUILD 版本字面量存在、ping 返回 build
 const fs = require('fs');
 const path = require('path');
-const CLOUD = path.join(__dirname, '..', '..', '..', 'wxminiprogram', 'cloudfunctions', 'adminApi', 'index.js');
+const CLOUD = path.join(__dirname, '..', '..', 'wxminiprogram', 'cloudfunctions', 'adminApi', 'index.js');
 const src = fs.readFileSync(CLOUD, 'utf8');
 
 const EXPECTED_ACTIONS = [
@@ -52,7 +52,7 @@ const EXPECTED_ACTIONS = [
 ];
 const EXPECTED_SETS = "// 免鉴权 action（登录/学员自助/部署探针）\nconst PUBLIC_ACTIONS = new Set(['loginAdmin', 'loginStudent', 'changePassword', 'getTips', 'addRequest', 'ping']);\n// 登录前可调用（必须验证原密码，且有限速）\nconst PRELOGIN_ACTIONS = new Set(['changeAdminPassword']);\n// 学员会话可访问的 action\nconst STUDENT_ACTIONS = new Set(['getStudentSelf', 'getMyRequests', 'upsertMyUser']);\n// 仅超管（或服务端）可访问\nconst SUPERADMIN_ACTIONS = new Set(['addAdmin', 'updateAdmin', 'deleteAdmin', 'resetAdminPassword', 'importAdmins', 'initDefaultAdmin', 'exportAll', 'repairCourseDates']);";
 const EXPECTED_GATE = "  // ====== 调用方鉴权 ======\n  const secretOk = !!(SERVER_SECRET && typeof secret === 'string' && safeStrEqual(secret, SERVER_SECRET));\n  let session = await getSession(token);\n  if (PRELOGIN_ACTIONS.has(action)) {\n    // 登录前改密：无会话时必须提供 phone+原密码（有限速），有会话时用会话身份\n    if (!secretOk && !session) {\n      const d0 = data || {};\n      if (!d0.phone || !d0.oldPassword) {\n        return { success: false, code: 'UNAUTHORIZED', message: '请先登录' };\n      }\n    }\n  } else if (!PUBLIC_ACTIONS.has(action)) {\n    if (!secretOk && !session) {\n      return { success: false, code: 'UNAUTHORIZED', message: '未登录或登录已过期' };\n    }\n    if (!secretOk && (!session || session.type !== 'admin')) {\n      if (!STUDENT_ACTIONS.has(action)) {\n        return { success: false, code: 'FORBIDDEN', message: '需要管理员权限' };\n      }\n    }\n    if (SUPERADMIN_ACTIONS.has(action) && !secretOk && (!session || session.role !== 'superadmin')) {\n      return { success: false, code: 'FORBIDDEN', message: '需要超级管理员权限' };\n    }\n    // 首登强制改密：未改密的管理员会话只能改密/退出\n    if (!secretOk && session && session.type === 'admin' && session.mustChangePassword\n        && action !== 'changeAdminPassword' && action !== 'logout') {\n      return { success: false, code: 'FORCE_PASSWORD_CHANGE', message: '请先修改初始密码' };\n    }\n  }";
-const EXPECTED_DISPATCH = "  const handler = HANDLERS[action];\n  if (!handler) return { success: false, message: '未知操作: ' + action };\n  return handler({ event, data, id, status, reason, keyword, token, secret, session, secretOk });";
+const EXPECTED_DISPATCH = "  const handler = HANDLERS[action];\n  if (!handler) return { success: false, message: '未知操作: ' + action };\n  // 顶层兜底：handler 未捕获异常统一转业务失败（避免整次调用失败报文不透明）；唯一键冲突给业务文案\n  try {\n    return await handler({ event, data, id, status, reason, keyword, token, secret, session, secretOk });\n  } catch (e) {\n    if (isDupKeyErr(e)) return { success: false, message: '数据重复：该手机号或账号已存在' };\n    console.error('adminApi handler error:', action, e);\n    // 详情只进日志：addRequest 是免鉴权入口，不向匿名调用方回显内部错误串（二轮审查L3）\n    return { success: false, message: '服务器内部错误，请稍后重试' };\n  }";
 
 const failures = [];
 const keys = [...src.matchAll(/^    (\w+): async \(ctx\) => \{$/gm)].map(m => m[1]);
@@ -66,10 +66,17 @@ if (/switch\s*\(action\)/.test(src)) failures.push('switch(action) 仍在（R12 
 if ((src.match(/^    default:/gm) || []).length !== 0) failures.push('default 标签仍在');
 if (!/const BUILD = '[^']+';/.test(src)) failures.push('BUILD 版本字面量缺失');
 if (!src.includes('build: BUILD')) failures.push('ping 未返回 build: BUILD');
+// 二轮审查：班级域过滤 classFiltered 1定义+21调用（读写/提示/同步全量路径），数量漂移即报
+const classFilteredN = (src.match(/classFiltered\(/g) || []).length;
+if (classFilteredN !== 22) failures.push('classFiltered( 出现次数≠22(1定义+21调用，二轮班级域后): got ' + classFilteredN);
+['getAllTips', 'updateTip', 'deleteTip'].forEach(a => {
+  if (!new RegExp('    ' + a + ': async').test(src)) failures.push(a + ' handler 缺失');
+});
+if ((src.match(/tipQuery = tipQuery\.where\(\{ className: _\.in\(actor\.classes\) \}\)/g) || []).length < 1) failures.push('getAllTips 班级域查询缺失');
 
 if (failures.length) {
   console.error('check-adminapi-actions FAIL');
   failures.forEach(f => console.error(' - ' + f));
   process.exit(1);
 }
-console.log('check-adminapi-actions OK: 38 actions 名单顺序一致(含ping) / 鉴权四集合逐字(PUBLIC含ping) / 鉴权块逐字 / 分发兜底逐字 / switch+default 清零 / BUILD+ping探针在位');
+console.log('check-adminapi-actions OK: 38 actions 名单顺序一致(含ping) / 鉴权四集合逐字(PUBLIC含ping) / 鉴权块逐字 / 分发兜底逐字(含顶层try/catch，L3内部错误串不外泄) / switch+default 清零 / BUILD+ping探针在位 / classFiltered=22(1定义+21调用)');

@@ -1,11 +1,11 @@
 const cloud = require('wx-server-sdk');
 const XLSX = require('xlsx');
 const crypto = require('crypto');
-// R3 单源：shared/import-tools.js 为权威源（webadmin/admin-server/shared/），本目录副本由 sync-shared.js 复制
+// R3 单源：shared/import-tools.js 为权威源（admin-server/shared/），本目录副本由 sync-shared.js 复制
 const { detectFieldMapping, getField, asStr, parseExcelDate, formatDateStr } = require('./shared/import-tools');
 // R4 单源：shared/course-dates.js（依赖 import-tools，course-dates 内部 require 同目录 import-tools）
 const { generateCourseDates, generateCourseDatesMulti } = require('./shared/course-dates');
-cloud.init({ env: 'cloud1-d6gio7v8iff39bab7' });
+cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 const $ = db.command.aggregate;
@@ -16,7 +16,7 @@ const $ = db.command.aggregate;
 const SERVER_SECRET = process.env.ADMIN_API_SECRET || '';
 const TOKEN_TTL = 7 * 24 * 60 * 60 * 1000;
 // 部署版本标识：ping 探针返回（真源=本字面量；每批次部署同步改串，部署后 ping 返回同串即实证）
-const BUILD = '2026-10-02-AtoE+W4';
+const BUILD = '2026-10-03-Review';
 
 // 免鉴权 action（登录/学员自助/部署探针）
 const PUBLIC_ACTIONS = new Set(['loginAdmin', 'loginStudent', 'changePassword', 'getTips', 'addRequest', 'ping']);
@@ -298,10 +298,15 @@ exports.main = async (event, context) => {
     },
 
     addStudent: async (ctx) => {
-      const { data, id } = ctx;
+      const { data, id, event, session } = ctx;
       const { name, phone, className, schedule, deadline, location, courseDates, courseStartDate, courseEndDate, idCard, company } = data;
       if (!name || !phone || !className || !schedule || !location) {
         return { success: false, message: '请填写所有必填字段' };
+      }
+      // 班级域（H1）：受限管理员只能写自己负责的班级；超管/无班级/secret 内部调用豁免
+      const actor = getActor(event, session);
+      if (classFiltered(actor) && !actor.classes.includes(className)) {
+        return { success: false, message: '无权操作其他班级的学员' };
       }
       // 初始密码：身份证后6位，没身份证用手机后6位
       const initPassword = (idCard && idCard.length >= 6) ? idCard.slice(-6) : phone.slice(-6);
@@ -311,6 +316,10 @@ exports.main = async (event, context) => {
         : (courseDates || []);
       const existing = await db.collection('students').where({ phone }).get();
       if (existing.data.length > 0) {
+        // 按手机号 upsert 命中已有记录时，同样受班级域约束（防止跨班覆写）
+        if (classFiltered(actor) && !actor.classes.includes(existing.data[0].className)) {
+          return { success: false, message: '该手机号属于其他班级的学员，无权覆盖' };
+        }
         await db.collection('students').doc(existing.data[0]._id).update({
           data: { name, className, schedule, deadline: deadline || '', location, courseDates: calcDates, courseStartDate: courseStartDate || '', courseEndDate: courseEndDate || '', idCard: idCard || '', company: company || '', updatedAt: new Date() }
         });
@@ -323,9 +332,23 @@ exports.main = async (event, context) => {
     },
 
     updateStudent: async (ctx) => {
-      const { data } = ctx;
+      const { data, event, session } = ctx;
       const { _id, name, phone, className, schedule, deadline, location, courseDates, courseStartDate, courseEndDate, idCard, company } = data;
       if (!_id) return { success: false, message: '缺少学员ID' };
+      // 班级域（H1）：先取目标学员，受限管理员只能改自己班级的记录
+      const actor = getActor(event, session);
+      if (classFiltered(actor)) {
+        let targetDoc = null;
+        try { const t = await db.collection('students').doc(_id).get(); targetDoc = t.data || null; } catch (e) { targetDoc = null; }
+        if (!targetDoc) return { success: false, message: '学员不存在' };
+        if (!actor.classes.includes(targetDoc.className)) {
+          return { success: false, message: '无权操作其他班级的学员' };
+        }
+        // 班级域（二轮审查M1）：改班字段同样受限，防止把本班学员改到任意班级
+        if (className !== undefined && className !== '' && !actor.classes.includes(className)) {
+          return { success: false, message: '无权将学员改到其他班级' };
+        }
+      }
       // 手机号查重预检（改号冲突写入前拦截；竞态由唯一键 catch 兜底）
       if (phone !== undefined && phone) {
         const dup = await db.collection('students').where({ phone }).get();
@@ -348,13 +371,20 @@ exports.main = async (event, context) => {
     },
 
     deleteStudent: async (ctx) => {
-      const { data, id } = ctx;
+      const { data, id, event, session } = ctx;
       if (!id) return { success: false, message: '缺少学员ID' };
       let stuPhone = '';
+      let stuClassName = '';
       try {
         const stu = await db.collection('students').doc(id).get();
         stuPhone = (stu.data && stu.data.phone) || '';
+        stuClassName = (stu.data && stu.data.className) || '';
       } catch (e) { /* 学员不存在也继续删（幂等） */ }
+      // 班级域（H1）：受限管理员只能删自己班级的学员；查不到目标时拒绝（不做跨班幂等删）
+      const actor = getActor(event, session);
+      if (classFiltered(actor) && (!stuClassName || !actor.classes.includes(stuClassName))) {
+        return { success: false, message: '无权操作其他班级的学员' };
+      }
       await db.collection('students').doc(id).remove();
       // 账户同步：学员删除后其登录账户与会话一并清除，保持与学员列表一致
       if (stuPhone) {
@@ -365,21 +395,29 @@ exports.main = async (event, context) => {
     },
 
     batchDeleteStudents: async (ctx) => {
-      const { data, id } = ctx;
+      const { data, id, event, session } = ctx;
       const { ids } = data;
       if (!ids || ids.length === 0) return { success: false, message: '请选择要删除的学员' };
-      // 先取手机号：删完学员后需联动删账户/吊销会话
+      // 先取手机号与班级：删完学员后需联动删账户/吊销会话；班级域校验也用
       const phones = [];
+      const scope = {}; // _id -> className
       try {
-        const docs = await db.collection('students').where({ _id: _.in(ids) }).field({ phone: 1 }).limit(1000).get();
-        docs.data.forEach(s => { if (s.phone) phones.push(s.phone); });
+        const docs = await db.collection('students').where({ _id: _.in(ids) }).field({ phone: 1, className: 1 }).limit(1000).get();
+        docs.data.forEach(s => { if (s.phone) phones.push(s.phone); scope[s._id] = s.className || ''; });
       } catch (e) {
         for (const sid of ids) {
           try {
             const d = await db.collection('students').doc(sid).get();
             if (d.data && d.data.phone) phones.push(d.data.phone);
+            if (d.data) scope[sid] = d.data.className || '';
           } catch (e2) { /* 读不到则跳过该条的账户联动 */ }
         }
+      }
+      // 班级域（H1）：受限管理员整批只能删自己班级的学员；任一记录不在范围（含不存在）即整批拒绝
+      const actor = getActor(event, session);
+      if (classFiltered(actor)) {
+        const out = ids.filter(sid => scope[sid] === undefined || !actor.classes.includes(scope[sid]));
+        if (out.length > 0) return { success: false, message: '所选学员包含不在您班级范围或不存在的记录，未执行删除' };
       }
       try {
         // 一条语句批量删（复审 #7）；个别环境不支持 _id + _.in 时回退逐条删
@@ -407,13 +445,22 @@ exports.main = async (event, context) => {
 
     // ====== 密码管理 ======
     resetPassword: async (ctx) => {
-      const { data, id } = ctx;
+      const { data, id, event, session } = ctx;
       const stuId = id;
       if (!stuId) return { success: false, message: '缺少学员ID' };
-      const stu = await db.collection('students').doc(stuId).get();
-      if (!stu.data) return { success: false, message: '学员不存在' };
-      const idCard = stu.data.idCard || '';
-      const phone = stu.data.phone || '';
+      let stuData = null;
+      try { const stu = await db.collection('students').doc(stuId).get(); stuData = stu.data || null; } catch (e) { stuData = null; }
+      // 班级域（H1）：受限管理员只能重置自己班级学员的密码；不存在与越界统一文案，防存在性探测（二轮审查L4）
+      const actor = getActor(event, session);
+      if (!stuData) {
+        if (classFiltered(actor)) return { success: false, message: '无权操作或学员不存在' };
+        return { success: false, message: '学员不存在' };
+      }
+      if (classFiltered(actor) && !actor.classes.includes(stuData.className || '')) {
+        return { success: false, message: '无权操作或学员不存在' };
+      }
+      const idCard = stuData.idCard || '';
+      const phone = stuData.phone || '';
       const newPwd = (idCard.length >= 6) ? idCard.slice(-6) : phone.slice(-6);
       await db.collection('students').doc(stuId).update({
         data: { password: hashPassword(newPwd), mustChangePassword: true }
@@ -596,9 +643,15 @@ exports.main = async (event, context) => {
 
     addRequest: async (ctx) => {
       const { data, status } = ctx;
-      const { name, phone, carPlate, entryDate, entryStartTime, entryEndTime } = data;
+      const { name, carPlate, entryDate, entryStartTime, entryEndTime } = data;
+      // 手机号归一化（二轮审查M4）：去空白+全角转半角，防限速/去重按变体绕过；再做格式校验
+      const phone = String(data.phone == null ? '' : data.phone).trim().replace(/[\uFF10-\uFF19]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
       if (!name || !phone) return { success: false, message: '请填写姓名和电话' };
+      if (!/^1\d{10}$/.test(phone)) return { success: false, message: '手机号格式错误' };
       if (!entryDate || !entryStartTime || !entryEndTime) return { success: false, message: '请选择进校日期和时间段' };
+      // 公开接口限速：同一手机号 10 分钟窗口内最多 5 次提交（防表单刷量）
+      const limiterKey = 'req:' + phone;
+      if (await rateLimited(limiterKey)) return { success: false, message: '提交过于频繁，请10分钟后再试' };
       const pendingRes = await db.collection('entry_requests').where({ phone, status: 'pending' }).limit(1).get();
       if (pendingRes.data.length > 0) return { success: false, message: '您已有待审核的申请' };
       await db.collection('entry_requests').add({
@@ -608,12 +661,27 @@ exports.main = async (event, context) => {
           status: 'pending', createdAt: new Date()
         }
       });
+      await recordFail(limiterKey); // 复用计数器：按提交次数累计（窗口内满 5 次后锁定）
       return { success: true, message: '申请已提交' };
     },
 
     approveRequest: async (ctx) => {
-      const { data, id, status } = ctx;
+      const { data, id, status, reason, event, session } = ctx;
       if (!id) return { success: false, message: '缺少申请ID' };
+      let reqDoc = null;
+      try { const r = await db.collection('entry_requests').doc(id).get(); reqDoc = r.data || null; } catch (e) { reqDoc = null; }
+      // 班级域（H1）：受限管理员只能处理本班学员的申请（entry_requests 无班级字段，经手机号关联）；不存在与越界统一文案（二轮审查L4）
+      const actor = getActor(event, session);
+      if (!reqDoc) {
+        if (classFiltered(actor)) return { success: false, message: '无权处理或申请不存在' };
+        return { success: false, message: '申请不存在' };
+      }
+      if (classFiltered(actor)) {
+        const stuRes = await db.collection('students').where({ phone: reqDoc.phone }).limit(1000).get();
+        if (!stuRes.data.some(s => actor.classes.includes(s.className))) {
+          return { success: false, message: '无权处理或申请不存在' };
+        }
+      }
       await db.collection('entry_requests').doc(id).update({
         data: { status: 'approved', processedAt: new Date() }
       });
@@ -621,8 +689,22 @@ exports.main = async (event, context) => {
     },
 
     rejectRequest: async (ctx) => {
-      const { data, id, status, reason } = ctx;
+      const { data, id, status, reason, event, session } = ctx;
       if (!id) return { success: false, message: '缺少申请ID' };
+      let reqDoc = null;
+      try { const r = await db.collection('entry_requests').doc(id).get(); reqDoc = r.data || null; } catch (e) { reqDoc = null; }
+      // 班级域（H1）：受限管理员只能处理本班学员的申请；不存在与越界统一文案（二轮审查L4）
+      const actor = getActor(event, session);
+      if (!reqDoc) {
+        if (classFiltered(actor)) return { success: false, message: '无权处理或申请不存在' };
+        return { success: false, message: '申请不存在' };
+      }
+      if (classFiltered(actor)) {
+        const stuRes = await db.collection('students').where({ phone: reqDoc.phone }).limit(1000).get();
+        if (!stuRes.data.some(s => actor.classes.includes(s.className))) {
+          return { success: false, message: '无权处理或申请不存在' };
+        }
+      }
       await db.collection('entry_requests').doc(id).update({
         data: { status: 'rejected', rejectReason: reason || '', processedAt: new Date() }
       });
@@ -670,9 +752,14 @@ exports.main = async (event, context) => {
     },
 
     syncAccounts: async (ctx) => {
-      const { data } = ctx;
+      const { data, event, session } = ctx;
+      // 班级域（二轮审查L1）：受限管理员只同步本班学员的账户；孤儿清理因学员列表非全量而天然跳过
+      const actor = getActor(event, session);
+      const filtered = classFiltered(actor);
       const stuCount = await db.collection('students').count();
-      const studentsRes = await db.collection('students').limit(1000).get();
+      let stuQuery = db.collection('students');
+      if (filtered) stuQuery = stuQuery.where({ className: _.in(actor.classes) });
+      const studentsRes = await stuQuery.limit(1000).get();
       const accountsRes = await db.collection('users').limit(1000).get();
       const students = studentsRes.data;
       const accounts = accountsRes.data;
@@ -689,9 +776,9 @@ exports.main = async (event, context) => {
           count++;
         }
       }
-      // 反向同步：学员已删除的账户一并清理（学员必须全量取到，避免超过单次上限时误删）
+      // 反向同步：学员已删除的账户一并清理（学员必须全量取到，避免超过单次上限时误删；受限管理员不执行）
       let removed = 0;
-      if (students.length >= stuCount.total) {
+      if (!filtered && students.length >= stuCount.total) {
         for (const a of accounts) {
           if (a.phone && !stuPhones.has(a.phone)) {
             await db.collection('users').doc(a._id).remove().catch(() => {});
@@ -724,15 +811,17 @@ exports.main = async (event, context) => {
 
       // 入校申请按状态 count；受限管理员先取本班手机号做关联过滤
       const reqPhones = filtered ? [...new Set(students.map(s => s.phone))] : null;
+      // 空班级域（班内0学员）：提前短路，避免 `_.in([])` 行为未定义导致报错或口径泄露（二轮审查M3）
+      const emptyScope = filtered && reqPhones.length === 0;
       const reqConds = extra => {
         const conds = [...(extra || [])];
         if (filtered) conds.push({ phone: _.in(reqPhones) });
         return conds.length === 1 ? conds[0] : _.and(...conds);
       };
-      const pendingRequestCount = await countOf('entry_requests', reqConds([{ status: 'pending' }]));
-      const approvedCount = await countOf('entry_requests', reqConds([{ status: 'approved' }]));
-      const rejectedCount = await countOf('entry_requests', reqConds([{ status: 'rejected' }]));
-      const todayRequests = await countOf('entry_requests', reqConds([{ createdAt: createdAtRange }]));
+      const pendingRequestCount = emptyScope ? 0 : await countOf('entry_requests', reqConds([{ status: 'pending' }]));
+      const approvedCount = emptyScope ? 0 : await countOf('entry_requests', reqConds([{ status: 'approved' }]));
+      const rejectedCount = emptyScope ? 0 : await countOf('entry_requests', reqConds([{ status: 'rejected' }]));
+      const todayRequests = emptyScope ? 0 : await countOf('entry_requests', reqConds([{ createdAt: createdAtRange }]));
 
       let todayStudents, activeStudents, expiredStudents, classNames;
       if (filtered) {
@@ -748,7 +837,10 @@ exports.main = async (event, context) => {
         expiredStudents = await countOf('students', { deadline: _.and(_.gt(''), _.lt(today)) });
         classNames = await classNamesAggregate();
       }
-      const accountCount = await countOf('users');
+      // 账户数与其余统计口径一致：受限管理员只统计本班学员对应账户
+      const accountCount = filtered
+        ? (emptyScope ? 0 : await countOf('users', { phone: _.in(reqPhones) }))
+        : await countOf('users');
 
       return {
         success: true,
@@ -770,9 +862,11 @@ exports.main = async (event, context) => {
 
     // ====== 批量导入 ======
     importStudents: async (ctx) => {
-      const { event, data } = ctx;
+      const { event, data, session } = ctx;
       const { fileID } = event;
       if (!fileID) return { success: false, message: '缺少文件ID' };
+      const actor = getActor(event, session);
+      const filtered = classFiltered(actor);
 
       // 下载文件
       const downloadRes = await cloud.downloadFile({ fileID });
@@ -810,6 +904,10 @@ exports.main = async (event, context) => {
           if (!className) { errors.push(`第${rowNum}行：班级名称为空`); failed++; continue; }
           if (!schedule) { errors.push(`第${rowNum}行：上课时间段为空`); failed++; continue; }
           if (!location) { errors.push(`第${rowNum}行：上课地点为空`); failed++; continue; }
+          // 班级域（二轮审查H2）：受限管理员不能把其他班级的学员导入/覆写
+          if (filtered && !actor.classes.includes(className)) {
+            errors.push(`第${rowNum}行：无权导入其他班级的学员`); failed++; continue;
+          }
 
           const courseDates = generateCourseDatesMulti(schedule, courseStartDate, courseEndDate);
           const startStr = formatDateStr(parseExcelDate(courseStartDate)) || String(courseStartDate || '');
@@ -818,6 +916,9 @@ exports.main = async (event, context) => {
 
           const existing = await db.collection('students').where({ phone }).get();
           if (existing.data.length > 0) {
+            if (filtered && !actor.classes.includes(existing.data[0].className || '')) {
+              errors.push(`第${rowNum}行：该手机号属于其他班级的学员，无权覆盖`); failed++; continue;
+            }
             await db.collection('students').doc(existing.data[0]._id).update({
               data: { ...studentData, updatedAt: new Date() }
             });
@@ -962,15 +1063,24 @@ exports.main = async (event, context) => {
     },
 
     getAllTips: async (ctx) => {
-      const { data } = ctx;
-      const allTipRes = await db.collection('tips').orderBy('className', 'asc').limit(100).get();
+      const { data, event, session } = ctx;
+      // 班级域（二轮审查L2）：受限管理员只看本班提示
+      const actor = getActor(event, session);
+      let tipQuery = db.collection('tips');
+      if (classFiltered(actor)) tipQuery = tipQuery.where({ className: _.in(actor.classes) });
+      const allTipRes = await tipQuery.orderBy('className', 'asc').limit(100).get();
       return { success: true, data: allTipRes.data };
     },
 
     updateTip: async (ctx) => {
-      const { data, session } = ctx;
+      const { data, session, event } = ctx;
       const { className: tipClass2, content: tipContent } = data || {};
       if (!tipClass2) return { success: false, message: '请选择班级' };
+      // 班级域（二轮审查L2）：受限管理员只能保存本班提示
+      const actor = getActor(event, session);
+      if (classFiltered(actor) && !actor.classes.includes(tipClass2)) {
+        return { success: false, message: '无权管理其他班级的提示' };
+      }
       const existingTip = await db.collection('tips').where({ className: tipClass2 }).get();
       if (existingTip.data.length > 0) {
         await db.collection('tips').doc(existingTip.data[0]._id).update({
@@ -985,9 +1095,17 @@ exports.main = async (event, context) => {
     },
 
     deleteTip: async (ctx) => {
-      const { data, id } = ctx;
+      const { data, id, event, session } = ctx;
       const { id: tipId } = data || {};
       if (!tipId) return { success: false, message: '缺少提示ID' };
+      // 班级域（二轮审查L2）：先取提示校验班级，受限管理员只能删本班
+      let tipDoc = null;
+      try { const t = await db.collection('tips').doc(tipId).get(); tipDoc = t.data || null; } catch (e) { tipDoc = null; }
+      if (!tipDoc) return { success: false, message: '提示不存在' };
+      const actor = getActor(event, session);
+      if (classFiltered(actor) && !actor.classes.includes(tipDoc.className || '')) {
+        return { success: false, message: '无权删除其他班级的提示' };
+      }
       await db.collection('tips').doc(tipId).remove();
       return { success: true, message: '删除成功' };
     },
@@ -1003,9 +1121,12 @@ exports.main = async (event, context) => {
     },
 
     importAdmins: async (ctx) => {
-      const { data } = ctx;
+      const { data, event, session } = ctx;
       const { admins: adminList } = data || {};
       if (!adminList || adminList.length === 0) return { success: false, message: '没有数据' };
+      // 提权防护（二轮审查H1）：服务端带 secret 调用时 gate 不拦，这里凭 actorRole 再验一次
+      const actor = getActor(event, session);
+      if (actor && actor.role !== 'superadmin') return { success: false, message: '需要超级管理员权限' };
       let addedA = 0, failedA = 0;
       const errorsA = [];
       for (let i = 0; i < adminList.length; i++) {
@@ -1086,5 +1207,13 @@ exports.main = async (event, context) => {
   };
   const handler = HANDLERS[action];
   if (!handler) return { success: false, message: '未知操作: ' + action };
-  return handler({ event, data, id, status, reason, keyword, token, secret, session, secretOk });
+  // 顶层兜底：handler 未捕获异常统一转业务失败（避免整次调用失败报文不透明）；唯一键冲突给业务文案
+  try {
+    return await handler({ event, data, id, status, reason, keyword, token, secret, session, secretOk });
+  } catch (e) {
+    if (isDupKeyErr(e)) return { success: false, message: '数据重复：该手机号或账号已存在' };
+    console.error('adminApi handler error:', action, e);
+    // 详情只进日志：addRequest 是免鉴权入口，不向匿名调用方回显内部错误串（二轮审查L3）
+    return { success: false, message: '服务器内部错误，请稍后重试' };
+  }
 };

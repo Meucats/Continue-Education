@@ -7,6 +7,7 @@ Page({
     adminPhone: '',
     adminPassword: '',
     adminInfo: null,
+    loggingIn: false,
     stats: {
       studentCount: 0,
       requestCount: 0
@@ -34,6 +35,7 @@ Page({
   },
 
   onAdminLogin: function () {
+    if (this.data.loggingIn) return; // 防双击重复提交（二轮审查）
     const { adminPhone, adminPassword } = this.data;
 
     if (!adminPhone.trim()) {
@@ -46,21 +48,24 @@ Page({
       return;
     }
 
+    this.setData({ loggingIn: true });
     wx.showLoading({ title: '登录中...' });
 
     callAdminApi('loginAdmin', { phone: adminPhone.trim(), password: adminPassword.trim() }).then(res => {
       wx.hideLoading();
+      this.setData({ loggingIn: false });
       if (res && res.success) {
         const admin = res.data;
         const safeAdmin = { _id: admin._id, phone: admin.phone, name: admin.name, role: admin.role || 'admin', classes: admin.classes || [], token: admin.token };
-        app.globalData.isAdmin = true;
-        app.globalData.adminInfo = safeAdmin;
-        wx.setStorageSync('adminSession', safeAdmin);
         if (admin.mustChangePassword) {
+          // 与 login.js 同口径：强制改密阶段不落登录态，避免被 restoreSession 当正常管理员恢复（改密走 phone+原密码）
           this.setData({ adminPassword: '' });
           wx.reLaunch({ url: '/pages/login/login' });
           return;
         }
+        app.globalData.isAdmin = true;
+        app.globalData.adminInfo = safeAdmin;
+        wx.setStorageSync('adminSession', safeAdmin);
         this.setData({
           isAdmin: true,
           adminInfo: safeAdmin,
@@ -73,6 +78,7 @@ Page({
       }
     }).catch(err => {
       wx.hideLoading();
+      this.setData({ loggingIn: false });
       wx.showToast({ title: (err && err.message) || '登录失败', icon: 'none' });
       console.error(err);
     });
@@ -83,10 +89,10 @@ Page({
       if (res && res.success) {
         this.setData({
           'stats.studentCount': res.data.studentCount || 0,
-          'stats.requestCount': res.data.requestCount || 0
+          'stats.requestCount': res.data.pendingRequestCount || 0
         });
       }
-    }).catch(() => {});
+    }).catch(err => { console.error('loadStats error:', err); });
   },
 
   goToStudents: function () {

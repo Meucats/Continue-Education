@@ -1,0 +1,21 @@
+{
+  "name": "hgd-admin-server",
+  "version": "1.0.0",
+  "description": "杭职大继续教育培训服务管理系统 - 管理后台",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node scripts/check-html.js && node scripts/check-w2-refactor.js && node scripts/check-w3-server.js && node --check server.js && node --check shared/import-tools.js && node --check shared/course-dates.js && node --check ../wxminiprogram/cloudfunctions/adminApi/index.js && node --check ../wxminiprogram/cloudfunctions/adminApi/shared/import-tools.js && node --check ../wxminiprogram/miniprogram/pages/admin-add/admin-add.js && node --check ../wxminiprogram/miniprogram/pages/login/login.js && node --check ../wxminiprogram/miniprogram/pages/admin/admin.js && node --check ../wxminiprogram/miniprogram/pages/admin-students/admin-students.js && node --check ../wxminiprogram/miniprogram/pages/admin-accounts/admin-accounts.js && node --check ../wxminiprogram/miniprogram/pages/admin-requests/admin-requests.js && node --check ../wxminiprogram/miniprogram/utils/api.js && node --check ../wxminiprogram/miniprogram/utils/util.js && node --check test/e2e-profile.js && node --check test/e2e-classmatrix.js && node --check test/e2e-concurrency.js && node scripts/check-excel-aliases.js && node scripts/check-shared.js && node scripts/check-adminapi-actions.js && node scripts/check-warm-window.js",
+    "e2e": "node test/e2e-profile.js && node test/e2e-classmatrix.js && node test/e2e-concurrency.js",
+    "e2e:profile": "node test/e2e-profile.js",
+    "e2e:classmatrix": "node test/e2e-classmatrix.js",
+    "e2e:concurrency": "node test/e2e-concurrency.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.24.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
+}

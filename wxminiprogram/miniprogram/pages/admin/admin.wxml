@@ -3,7 +3,7 @@
     <view class="login-header">
       <image class="school-logo" src="/images/school-emblem.png" mode="aspectFit" />
       <view class="admin-title">管理后台</view>
-      <view class="admin-subtitle">杭职大继续教育学院</view>
+      <view class="admin-subtitle">杭职大继续教育培训服务管理系统</view>
     </view>
 
     <view class="login-form card m-enter m-enter-d2">
@@ -17,7 +17,7 @@
         <input class="input-field" password placeholder="请输入密码" placeholder-class="ph" value="{{adminPassword}}" bindinput="onInput" data-field="adminPassword" />
       </view>
 
-      <button class="btn-primary login-btn" bindtap="onAdminLogin">登录</button>
+      <button class="btn-primary login-btn" bindtap="onAdminLogin" loading="{{loggingIn}}" disabled="{{loggingIn}}">登录</button>
     </view>
 
     <view class="login-tip">

@@ -13,9 +13,9 @@ const SRC_TOOLS = path.join(SHARED_DIR, 'import-tools.js');
 const SRC_DATES = path.join(SHARED_DIR, 'course-dates.js');
 // 消费端副本目录（与 scripts/sync-shared.js TARGETS 一致）
 const COPY_DIRS = [
-  path.join(ROOT, '..', '..', 'wxminiprogram', 'cloudfunctions', 'adminApi', 'shared'),
+  path.join(ROOT, '..', 'wxminiprogram', 'cloudfunctions', 'adminApi', 'shared'),
   path.join(ROOT, 'public', 'shared'),
-  path.join(ROOT, '..', '..', 'wxminiprogram', 'miniprogram', 'shared')
+  path.join(ROOT, '..', 'wxminiprogram', 'miniprogram', 'shared')
 ];
 
 const failures = [];

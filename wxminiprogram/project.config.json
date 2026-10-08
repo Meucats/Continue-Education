@@ -46,7 +46,7 @@
   "cloudfunctionTemplateRoot": "",
   "cloudfunctionTemplateEnv": "cloud1-d6gio7v8iff39bab7",
   "condition": {},
-  "description": "杭职大继续教育学院进校系统",
+  "description": "杭职大继续教育培训服务管理系统",
   "compileType": "miniprogram",
   "simulatorPluginLibVersion": {},
   "packOptions": {

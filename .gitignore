@@ -8,15 +8,15 @@ node_modules/
 **/.token-secret
 **/.token-state.json
 **/admins.json
-webadmin/admin-server/data/
-webadmin/admin-server/uploads/
 admin-server/data/
 admin-server/uploads/
 uploads/
 **/scripts/out/
-webadmin/.env
 .env
 .env.*
+
+# 云空间导出（含个人信息与密码哈希，仅留本地）
+wx小程序云空间的配置信息/
 
 # 小程序依赖构建产物（用微信开发者工具重新生成）
 wxminiprogram/miniprogram_npm/
@@ -39,4 +39,4 @@ wxminiprogram/project.private.config.json
 **/~$*
 
 # 改版前 HTML 备份（本地回滚用，不入库）
-webadmin/admin-server/backups/
+admin-server/backups/

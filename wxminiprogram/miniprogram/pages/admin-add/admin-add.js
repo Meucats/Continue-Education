@@ -46,7 +46,7 @@ Page({
       this.previewDates();
     }).catch(err => {
       wx.hideLoading();
-      wx.showToast({ title: '加载失败', icon: 'none' });
+      if (!err || err.code !== 'UNAUTHORIZED') wx.showToast({ title: '加载失败', icon: 'none' });
       console.error(err);
     });
   },
@@ -119,31 +119,41 @@ Page({
 
     if (isEdit) {
       data._id = editId;
-      callAdminApi('updateStudent', data).then(() => {
-        wx.showToast({ title: '保存成功', icon: 'success' });
-        setTimeout(() => wx.navigateBack(), 1500);
+      callAdminApi('updateStudent', data).then(res => {
+        if (res && res.success) {
+          wx.showToast({ title: res.message || '保存成功', icon: 'success' });
+          setTimeout(() => wx.navigateBack(), 1500);
+        } else {
+          // 业务失败（如手机号冲突）不再谎报成功
+          wx.showToast({ title: (res && res.message) || '保存失败', icon: 'none' });
+        }
       }).catch(err => {
-        wx.showToast({ title: '保存失败', icon: 'none' });
+        if (!err || err.code !== 'UNAUTHORIZED') wx.showToast({ title: '保存失败', icon: 'none' });
         console.error(err);
       }).finally(() => { this.setData({ submitting: false }); });
     } else {
       callAdminApi('addStudent', data).then(res => {
-        if (res && res.initPassword) {
-          wx.showModal({
-            title: '添加成功',
-            content: '初始密码：' + res.initPassword + '（学员首次登录需修改）',
-            showCancel: false
+        if (res && res.success) {
+          if (res.initPassword) {
+            wx.showModal({
+              title: '添加成功',
+              content: '初始密码：' + res.initPassword + '（学员首次登录需修改）',
+              showCancel: false
+            });
+          } else {
+            // 按手机号命中已有记录走 upsert：透传云端文案，不谎报「添加成功」
+            wx.showToast({ title: res.message || '学员信息已更新', icon: 'none' });
+          }
+          this.setData({
+            formData: { name: '', phone: '', idCard: '', company: '', className: '', schedule: '', courseStartDate: '', courseEndDate: '', deadline: '', location: '', courseDates: [] },
+            generatedDates: []
           });
+          setTimeout(() => wx.navigateBack(), 1500);
         } else {
-          wx.showToast({ title: '添加成功', icon: 'success' });
+          wx.showToast({ title: (res && res.message) || '添加失败', icon: 'none' });
         }
-        this.setData({
-          formData: { name: '', phone: '', idCard: '', company: '', className: '', schedule: '', courseStartDate: '', courseEndDate: '', deadline: '', location: '', courseDates: [] },
-          generatedDates: []
-        });
-        setTimeout(() => wx.navigateBack(), 1500);
       }).catch(err => {
-        wx.showToast({ title: '添加失败', icon: 'none' });
+        if (!err || err.code !== 'UNAUTHORIZED') wx.showToast({ title: '添加失败', icon: 'none' });
         console.error(err);
       }).finally(() => { this.setData({ submitting: false }); });
     }

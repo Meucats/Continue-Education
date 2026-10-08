@@ -10,12 +10,12 @@
   </view>
 
   <view class="stats-bar">
-    <text class="stats-text">共 {{accounts.length}} 个账户</text>
+    <text class="stats-text">共 {{filteredAccounts.length}} 个账户</text>
     <view class="export-btn" bindtap="onExport">导出账户信息</view>
   </view>
 
-  <view class="account-list" wx:if="{{accounts.length > 0}}">
-    <view class="account-card card" wx:for="{{accounts}}" wx:key="_id">
+  <view class="account-list" wx:if="{{filteredAccounts.length > 0}}">
+    <view class="account-card card" wx:for="{{filteredAccounts}}" wx:key="_id">
       <view class="account-header">
         <view class="account-name">{{item.name}}</view>
         <view class="account-role {{item.role === 'admin' ? 'admin-role' : 'student-role'}}">

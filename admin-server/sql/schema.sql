@@ -1,4 +1,4 @@
--- 进校系统 MySQL 表结构（设计文档 §5）
+-- 杭职大继续教育培训服务管理系统 MySQL 表结构（设计文档 §5）
 -- 用法：mysql -u root -p < sql/schema.sql   或由 scripts/import-mysql.js 自动执行
 CREATE DATABASE IF NOT EXISTS entry_system
   DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;

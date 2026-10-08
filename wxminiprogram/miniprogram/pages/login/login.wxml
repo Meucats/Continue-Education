@@ -3,7 +3,7 @@
     <image class="school-logo" src="/images/school-emblem.png" mode="aspectFit" />
     <view class="school-name">杭州职业技术大学</view>
     <view class="college-name">继续教育学院</view>
-    <view class="system-name">进校管理系统</view>
+    <view class="system-name">杭职大继续教育培训服务管理系统</view>
   </view>
 
   <view class="login-form card m-enter m-enter-d2">
@@ -19,7 +19,7 @@
         placeholder="请输入密码" placeholder-class="ph" value="{{password}}" bindinput="onInput" data-field="password" />
     </view>
 
-    <button class="btn-primary login-btn" bindtap="onLogin">登录</button>
+    <button class="btn-primary login-btn" bindtap="onLogin" disabled="{{submitting}}">{{submitting ? '登录中...' : '登录'}}</button>
 
     <view class="admin-entry" bindtap="goToAdmin">
       <text>管理后台入口</text>

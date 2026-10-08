@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>杭职大继续教育学院 - 管理后台</title>
+    <title>杭职大继续教育培训服务管理系统 - 管理后台</title>
     <link rel="stylesheet" href="admin.css">
 </head>
 <body>
@@ -57,7 +57,7 @@
             </div>
         </div>
         <div class="login-brand-copy">
-            <h2><span>进校系统</span><br>管理后台</h2>
+            <h2><span>杭职大继续教育培训服务管理系统</span><br>管理后台</h2>
             <p>学员管理、入校审批与班级通知的一站式工作台。</p>
             <div class="login-brand-pills">
                 <span class="login-pill"><svg class="ico"><use href="#i-users"/></svg>学员管理</span>
@@ -108,7 +108,7 @@
         </div>
         <div class="footer-links">
             <a href="tel:56700015"><svg class="ico"><use href="#i-phone"/></svg>技术支持 56700015</a>
-            <span class="footer-version">进校管理系统 v1.0.0</span>
+            <span class="footer-version">杭职大继续教育培训服务管理系统 v1.0.0</span>
         </div>
     </footer>
 </div>
@@ -127,32 +127,32 @@
         <div class="nav-menu">
             <div class="nav-section">
                 <div class="nav-section-title">概览</div>
-                <div class="nav-item active" onclick="switchPage('dashboard', this)">
+                <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard', this)">
                     <span class="nav-icon"><svg class="ico"><use href="#i-grid"/></svg></span> 首页概览
                 </div>
             </div>
             <div class="nav-section">
                 <div class="nav-section-title">学员管理</div>
-                <div class="nav-item" onclick="switchPage('students', this)">
+                <div class="nav-item" data-page="students" onclick="switchPage('students', this)">
                     <span class="nav-icon"><svg class="ico"><use href="#i-users"/></svg></span> 学员列表
                 </div>
-                <div class="nav-item" onclick="switchPage('accounts', this)">
+                <div class="nav-item" data-page="accounts" onclick="switchPage('accounts', this)">
                     <span class="nav-icon"><svg class="ico"><use href="#i-key"/></svg></span> 学员账户
                 </div>
             </div>
             <div class="nav-section">
                 <div class="nav-section-title">审批管理</div>
-                <div class="nav-item" onclick="switchPage('requests', this)">
+                <div class="nav-item" data-page="requests" onclick="switchPage('requests', this)">
                     <span class="nav-icon"><svg class="ico"><use href="#i-clipboard"/></svg></span> 入校申请
                     <span class="nav-badge hidden" id="pendingBadge">0</span>
                 </div>
             </div>
             <div class="nav-section">
                 <div class="nav-section-title">系统设置</div>
-                <div class="nav-item" onclick="switchPage('admin-manage', this)">
+                <div class="nav-item" data-page="admin-manage" onclick="switchPage('admin-manage', this)">
                     <span class="nav-icon"><svg class="ico"><use href="#i-user"/></svg></span> 管理员管理
                 </div>
-                <div class="nav-item" onclick="switchPage('tips', this)">
+                <div class="nav-item" data-page="tips" onclick="switchPage('tips', this)">
                     <span class="nav-icon"><svg class="ico"><use href="#i-bulb"/></svg></span> 温馨提示
                 </div>
             </div>
@@ -201,7 +201,7 @@
                 <div class="welcome-banner">
                     <div class="welcome-left">
                         <div class="welcome-greeting" id="welcomeGreeting">上午好</div>
-                        <div class="welcome-text">欢迎回到杭职大继续教育学院管理后台</div>
+                        <div class="welcome-text">欢迎回到杭职大继续教育培训服务管理系统</div>
                         <div class="welcome-date" id="welcomeDate"></div>
                     </div>
                     <div class="welcome-right">
@@ -216,14 +216,14 @@
                 </div>
 
                 <div class="stats-grid">
-                    <div class="stat-card" onclick="switchPage('students', document.querySelectorAll('.nav-item')[1])">
+                    <div class="stat-card" onclick="switchPage('students', document.querySelector('.nav-item[data-page=&quot;students&quot;]'))">
                         <div class="stat-info">
                             <div class="stat-label"><svg class="ico"><use href="#i-users"/></svg>学员总数</div>
                             <div class="stat-number num" id="statStudents">—</div>
                         </div>
                         <div class="stat-arrow"><svg class="ico"><use href="#i-arrow-right"/></svg></div>
                     </div>
-                    <div class="stat-card" data-tone="warning" onclick="switchPage('requests', document.querySelectorAll('.nav-item')[3])">
+                    <div class="stat-card" data-tone="warning" onclick="switchPage('requests', document.querySelector('.nav-item[data-page=&quot;requests&quot;]'))">
                         <div class="stat-info">
                             <div class="stat-label"><svg class="ico"><use href="#i-clock"/></svg>待审核申请</div>
                             <div class="stat-number num" id="statPending">—</div>
@@ -249,7 +249,7 @@
                         <h3>快捷操作</h3>
                     </div>
                     <div class="action-grid">
-                        <div class="action-card" onclick="switchPage('students', document.querySelectorAll('.nav-item')[1]); setTimeout(showAddStudentModal, 300);">
+                        <div class="action-card" onclick="switchPage('students', document.querySelector('.nav-item[data-page=&quot;students&quot;]')); setTimeout(showAddStudentModal, 300);">
                             <div class="action-icon"><svg class="ico"><use href="#i-plus"/></svg></div>
                             <div class="action-text">添加学员</div>
                         </div>
@@ -257,7 +257,7 @@
                             <div class="action-icon"><svg class="ico"><use href="#i-upload"/></svg></div>
                             <div class="action-text">批量导入</div>
                         </div>
-                        <div class="action-card" onclick="switchPage('requests', document.querySelectorAll('.nav-item')[3])">
+                        <div class="action-card" onclick="switchPage('requests', document.querySelector('.nav-item[data-page=&quot;requests&quot;]'))">
                             <div class="action-icon"><svg class="ico"><use href="#i-clipboard"/></svg></div>
                             <div class="action-text">审批申请</div>
                         </div>
@@ -639,7 +639,7 @@
         <footer class="page-footer">
             <div class="footer-brand">
                 <span class="footer-dot"></span>
-                <span>© 2026 杭州职业技术大学继续教育学院 · 进校管理系统</span>
+                <span>© 2026 杭州职业技术大学继续教育学院 · 杭职大继续教育培训服务管理系统</span>
             </div>
             <div class="footer-links">
                 <a href="tel:56700015">技术支持 56700015</a>
@@ -922,9 +922,9 @@
         </div>
     </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.min.js"></script>
+<script src="vendor/gsap.min.js"></script>
+<script src="vendor/ScrollTrigger.min.js"></script>
+<script src="vendor/lenis.min.js"></script>
     <!-- R3/R4 单源 shared（UMD）：import-tools 必须先于 course-dates 加载（顺序由 scripts/check-html.js 守卫） -->
     <script src="shared/import-tools.js"></script>
     <script src="shared/course-dates.js"></script>
@@ -939,6 +939,12 @@ function escapeHtml(v) {
     return String(v)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+// 生成可安全嵌入双引号 HTML 属性的 JS 字符串字面量（用于行内事件处理器参数）：
+// JSON.stringify 出双引号 → 转 &quot;（HTML 属性解码回引号后交给内联 JS，转义语境才真正有效）
+function jsonAttr(v) {
+    return JSON.stringify(v === undefined || v === null ? '' : String(v))
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 // 行数据注册表：避免把用户数据拼进 onclick 字符串
 const rowStore = { tips: {}, admins: {}, students: {} };
@@ -1057,8 +1063,8 @@ function skeletonRows(cols, rows) {
 function emptyCell(cols, iconId, text, hint) {
     return '<tr><td colspan="' + cols + '"><div class="empty-state">' +
         '<div class="empty-icon">' + ico(iconId) + '</div>' +
-        '<div class="empty-text">' + text + '</div>' +
-        (hint ? '<div class="empty-hint">' + hint + '</div>' : '') +
+        '<div class="empty-text">' + escapeHtml(text) + '</div>' +
+        (hint ? '<div class="empty-hint">' + escapeHtml(hint) + '</div>' : '') +
         '</div></td></tr>';
 }
 
@@ -1138,13 +1144,18 @@ function loadTable(cfg) {
     const url = typeof cfg.url === 'function' ? cfg.url() : cfg.url;
     return apiFetch(url).then(r => r.json()).then(res => {
         if (res.success) {
-            cfg.onOk(res);
+            // 渲染/回调异常与网络异常分离：代码错误在表格里呈现，不误报成「网络问题」、也不留骨架屏
+            try { cfg.onOk(res); } catch (e) {
+                console.error('loadTable onOk error:', e);
+                tbody.innerHTML = emptyCell(cfg.cols, 'i-alert', '数据渲染失败', e && e.message);
+            }
             if (cfg.truncId) updateTruncHint(cfg.truncId, res);
         } else {
             if (cfg.truncId) updateTruncHint(cfg.truncId, null);
             tbody.innerHTML = emptyCell(cfg.cols, 'i-alert', '加载失败', res.message);
         }
-    }).catch(() => {
+    }).catch(e => {
+        console.error('loadTable fetch error:', e);
         if (cfg.truncId) updateTruncHint(cfg.truncId, null);
         tbody.innerHTML = emptyCell(cfg.cols, 'i-alert', '加载失败', cfg.failHint);
     });
@@ -1156,7 +1167,7 @@ function confirmThen(opts) {
     apiFetch(opts.url, { method: 'DELETE' }).then(r => r.json()).then(res => {
         if (res.success) { showToast(opts.okMsg || res.message || '已删除'); if (opts.reload) opts.reload(); }
         else showToast(res.message, 'error');
-    });
+    }).catch(e => { console.error('confirmThen delete error:', e); showToast('网络异常，请重试', 'error'); });
 }
 
 // 姓名联想下拉：模糊匹配姓名/联系电话，条目附带电话用于重名消歧；点击条目把姓名填入输入框并锁定该人
@@ -1260,6 +1271,7 @@ function saveRemembered(phone) {
 }
 function clearRemembered() { localStorage.removeItem('adminRemember'); }
 
+let sessionExpiredToastAt = 0; // 401 toast 去重：并行请求同时过期时只提示一次
 function apiFetch(url, options = {}) {
     const headers = { ...(options.headers || {}) };
     const session = getSession();
@@ -1270,7 +1282,10 @@ function apiFetch(url, options = {}) {
             closeSidebar();
             document.getElementById('adminPage').classList.add('hidden');
             document.getElementById('loginPage').classList.remove('hidden');
-            showToast('登录已过期，请重新登录', 'error');
+            if (Date.now() - sessionExpiredToastAt > 3000) {
+                sessionExpiredToastAt = Date.now();
+                showToast('登录已过期，请重新登录', 'error');
+            }
         }
         return r;
     });
@@ -1296,6 +1311,7 @@ function downloadWithAuth(url, filename) {
 
 function enterAdmin(data) {
     currentAdminRole = data.role || 'admin';
+    sessionExpiredToastAt = 0; // 新会话进入后重置 401 去重窗，避免吞掉下一次真实过期提示
     closeSidebar();
     document.getElementById('loginPage').classList.add('hidden');
     document.getElementById('adminPage').classList.remove('hidden');
@@ -1305,7 +1321,7 @@ function enterAdmin(data) {
     // 清掉上一个账号残留的数据与页面，回到首页
     allStudents = [];
     pendingCount = 0;
-    switchPage('dashboard', document.querySelectorAll('.nav-item')[0]);
+    switchPage('dashboard', document.querySelector('.nav-item[data-page="dashboard"]'));
     if (data.mustChangePassword) {
         showForcePasswordChange();
         return;
@@ -1619,21 +1635,37 @@ let dashboardStudentsOk = true;
 function dashboardToast(msg) {
     const dash = document.getElementById('page-dashboard');
     if (!dash || dash.classList.contains('hidden')) return;
+    if (!getSession()) return; // 会话过期时的并行失败不叠加提示，过期文案由 apiFetch 统一给
     showToast(msg, 'error');
 }
 
-// 带自动重试的请求：网络失败/非 JSON/success:false 都重试，退避 800ms 翻倍，共 3 次
-function fetchJsonWithRetry(url, attempts = 3, delay = 800) {
-    return apiFetch(url)
-        .then(r => r.json())
-        .then(res => {
-            if (res && res.success) return res;
-            if (attempts > 1) return new Promise(rs => setTimeout(rs, delay)).then(() => fetchJsonWithRetry(url, attempts - 1, delay * 2));
-            return res;
-        }, err => {
-            if (attempts > 1) return new Promise(rs => setTimeout(rs, delay)).then(() => fetchJsonWithRetry(url, attempts - 1, delay * 2));
+// 带自动重试的请求：网络失败 / 5xx / 非 JSON / success:false 都重试，退避 800ms 翻倍，共 3 次；
+// 401/403 等确定性响应直接返回不重试（会话过期时避免重复提示与请求风暴）
+// 硬约束：仅 GET（重试必须幂等），非 GET 调用直接抛错防未来误用（二轮审查）
+function fetchJsonWithRetry(url, attempts = 3, delay = 800, method = 'GET') {
+    if (method !== 'GET') throw new Error('fetchJsonWithRetry 仅支持 GET（重试必须幂等）');
+    const again = () => new Promise(rs => setTimeout(rs, delay)).then(() => fetchJsonWithRetry(url, attempts - 1, delay * 2));
+    return apiFetch(url).then(
+        r => {
+            if (r.status === 401 || r.status === 403) return { success: false, message: '登录已过期或无权限' };
+            if (r.status >= 500 && attempts > 1) return again();
+            return r.json().then(
+                res => {
+                    if (res && res.success) return res;
+                    if (attempts > 1 && r.status >= 200 && r.status < 300) return again();
+                    return res;
+                },
+                () => {
+                    if (attempts > 1) return again();
+                    throw new Error('响应解析失败');
+                }
+            );
+        },
+        err => {
+            if (attempts > 1) return again();
             throw err;
-        });
+        }
+    );
 }
 
 // 首页加载入口：学员与统计两段并行、互不阻塞
@@ -1774,6 +1806,8 @@ function loadStudents() { return loadTable(studentsTbl); }
 
 function renderStudents(students) {
     const tbody = document.getElementById('studentTableBody');
+    const ca = document.getElementById('checkAll');
+    if (ca) ca.checked = false; // 行重绘后同步表头全选状态，避免勾选态残留
     if (students.length === 0) {
         tbody.innerHTML = emptyCell(12, 'i-inbox', '暂无学员数据', '点击右上角「添加学员」或「批量导入」');
         return;
@@ -1795,9 +1829,9 @@ function renderStudents(students) {
             <td class="num">${escapeHtml(s.courseEndDate) || '-'}</td>
             <td class="num">${escapeHtml(s.deadline) || '-'}${courseDatesCount > 0 ? '<br><small style="color:var(--accent)">' + courseDatesCount + '节课</small>' : ''}</td>
             <td>
-                <button class="btn btn-ghost btn-sm btn-icon" onclick="editStudent('${escapeHtml(s._id)}')" title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>
-                <button class="btn btn-ghost btn-sm btn-icon" onclick="resetPassword('${escapeHtml(s._id)}')" title="重置密码" aria-label="重置密码">${ico('i-key','ico-sm')}</button>
-                <button class="btn btn-ghost btn-sm btn-icon" onclick="deleteStudent('${escapeHtml(s._id)}')" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="editStudent(${jsonAttr(s._id)})" title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="resetPassword(${jsonAttr(s._id)})" title="重置密码" aria-label="重置密码">${ico('i-key','ico-sm')}</button>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="deleteStudent(${jsonAttr(s._id)})" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>
             </td>
         </tr>`;
     }).join('');
@@ -1906,19 +1940,19 @@ function saveStudent() {
         return showToast('上课截止时间必须大于等于课程结束日期', 'error');
     }
     if (editId) {
-        apiFetch(`${API_BASE}/students/${editId}`, {
+        apiFetch(`${API_BASE}/students/${encodeURIComponent(editId)}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
         }).then(r => r.json()).then(res => {
             if (res.success) { showToast(res.message); closeModal(); loadStudents(); }
             else showToast(res.message, 'error');
-        });
+        }).catch(e => { console.error('saveStudent PUT error:', e); showToast('网络异常，请重试', 'error'); });
     } else {
         apiFetch(`${API_BASE}/students`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
         }).then(r => r.json()).then(res => {
             if (res.success) { showToast(res.message); closeModal(); loadStudents(); }
             else showToast(res.message, 'error');
-        });
+        }).catch(e => { console.error('saveStudent POST error:', e); showToast('网络异常，请重试', 'error'); });
     }
 }
 
@@ -1926,13 +1960,13 @@ function resetPassword(id) {
     const s = rowStore.students[id];
     const name = s ? s.name : '';
     if (!confirm(`确定要重置学员「${name}」的密码吗？\n重置后密码为身份证后6位（无身份证则为手机号后6位），登录后需重新修改密码。`)) return;
-    apiFetch(`${API_BASE}/students/${id}/reset-password`, { method: 'POST' }).then(r => r.json()).then(res => {
+    apiFetch(`${API_BASE}/students/${encodeURIComponent(id)}/reset-password`, { method: 'POST' }).then(r => r.json()).then(res => {
         if (res.success) {
             showToast('密码已重置为：' + res.newPassword);
         } else {
             showToast(res.message, 'error');
         }
-    });
+    }).catch(e => { console.error('resetPassword error:', e); showToast('网络异常，请重试', 'error'); });
 }
 
 function deleteStudent(id) {
@@ -1940,7 +1974,7 @@ function deleteStudent(id) {
     const name = s ? s.name : '';
     confirmThen({
         msg: `确定要删除学员「${name}」吗？其登录账户将同步删除，此操作不可恢复。`,
-        url: `${API_BASE}/students/${id}`,
+        url: `${API_BASE}/students/${encodeURIComponent(id)}`,
         okMsg: '删除成功',
         reload: loadStudents
     });
@@ -1954,7 +1988,7 @@ function batchDeleteStudents() {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids })
     }).then(r => r.json()).then(res => {
         if (res.success) { showToast(res.message); loadStudents(); } else showToast(res.message, 'error');
-    });
+    }).catch(e => { console.error('batchDelete error:', e); showToast('网络异常，请重试', 'error'); });
 }
 
 // ============ Excel 导入 ============
@@ -2030,7 +2064,7 @@ const studentImportCtrl = makeImportController({
     successHtml: d => {
         let html = `<div class="result-box result-success">
             <span class="result-icon">${ico('i-check-circle')}</span>
-            <div><strong>导入完成</strong>：共 ${d.total} 条，新增 ${d.added} 条，更新 ${d.updated} 条，失败 ${d.failed} 条</div>
+            <div><strong>导入完成</strong>：共 ${Number(d.total) || 0} 条，新增 ${Number(d.added) || 0} 条，更新 ${Number(d.updated) || 0} 条，失败 ${Number(d.failed) || 0} 条</div>
         </div>`;
         if (d.errors.length > 0) {
             html += '<div class="error-list">' + d.errors.map(e => `<div class="error-item">${ico('i-alert','ico-sm')} ${escapeHtml(e)}</div>`).join('') + '</div>';
@@ -2079,18 +2113,25 @@ function renderRequests(requests) {
             <td><span class="tag ${statusClass}"><span class="tag-dot"></span>${statusText}</span></td>
             <td>
                 ${r.status === 'pending' ? `
-                    <button class="btn btn-success btn-sm" onclick="approveRequest('${escapeHtml(r._id)}')">${ico('i-check','ico-sm')}通过</button>
-                    <button class="btn btn-danger btn-sm" onclick="showRejectModal('${escapeHtml(r._id)}')">${ico('i-x','ico-sm')}拒绝</button>
+                    <button class="btn btn-success btn-sm" onclick="approveRequest(${jsonAttr(r._id)})">${ico('i-check','ico-sm')}通过</button>
+                    <button class="btn btn-danger btn-sm" onclick="showRejectModal(${jsonAttr(r._id)})">${ico('i-x','ico-sm')}拒绝</button>
                 ` : r.status === 'approved' ? '<span class="tag tag-approved"><span class="tag-dot"></span>已通过</span>' : r.status === 'rejected' ? '<span class="tag tag-rejected"><span class="tag-dot"></span>已拒绝</span>' : '<span style="color:var(--ink-3)">-</span>'}
             </td>
         </tr>`;
     }).join('');
 }
 
+let approveInFlight = false;
 function approveRequest(id) {
-    apiFetch(`${API_BASE}/requests/${id}/approve`, { method: 'POST' }).then(r => r.json()).then(res => {
+    if (approveInFlight) return;
+    approveInFlight = true;
+    apiFetch(`${API_BASE}/requests/${encodeURIComponent(id)}/approve`, { method: 'POST' }).then(r => r.json()).then(res => {
         if (res.success) { showToast('已通过'); loadRequests(); loadDashboard(); }
-    });
+        else showToast(res.message || '操作失败', 'error');
+    }).catch(e => {
+        console.error('approveRequest error:', e);
+        showToast('网络异常，请重试', 'error');
+    }).finally(() => { approveInFlight = false; });
 }
 
 function showRejectModal(id) {
@@ -2099,14 +2140,21 @@ function showRejectModal(id) {
     document.getElementById('rejectModal').classList.add('show');
 }
 function closeRejectModal() { document.getElementById('rejectModal').classList.remove('show'); }
+let rejectInFlight = false;
 function confirmReject() {
     const id = document.getElementById('rejectRequestId').value;
     const reason = document.getElementById('rejectReason').value.trim();
-    apiFetch(`${API_BASE}/requests/${id}/reject`, {
+    if (rejectInFlight) return;
+    rejectInFlight = true;
+    apiFetch(`${API_BASE}/requests/${encodeURIComponent(id)}/reject`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason })
     }).then(r => r.json()).then(res => {
         if (res.success) { showToast('已拒绝'); closeRejectModal(); loadRequests(); loadDashboard(); }
-    });
+        else showToast(res.message || '操作失败', 'error');
+    }).catch(e => {
+        console.error('confirmReject error:', e);
+        showToast('网络异常，请重试', 'error');
+    }).finally(() => { rejectInFlight = false; });
 }
 
 // ============ 学员账户 ============
@@ -2169,7 +2217,7 @@ function renderAccounts(accounts) {
 function syncAccounts() {
     apiFetch(`${API_BASE}/accounts/sync`, { method: 'POST' }).then(r => r.json()).then(res => {
         if (res.success) { showToast(res.message); loadAccounts(); } else showToast(res.message, 'error');
-    });
+    }).catch(e => { console.error('syncAccounts error:', e); showToast('网络异常，请重试', 'error'); });
 }
 
 // ============ 管理员管理 ============
@@ -2211,7 +2259,7 @@ function renderAdmins(admins) {
         return;
     }
     const isSuperAdmin = currentAdminRole === 'superadmin';
-    const currentPhone = localStorage.getItem('adminLogin') ? JSON.parse(localStorage.getItem('adminLogin')).phone : '';
+    const currentPhone = (getSession() || {}).phone || '';
     rowStore.admins = {};
     tbody.innerHTML = admins.map(a => {
         const rowId = a._id || a.id;
@@ -2227,9 +2275,9 @@ function renderAdmins(admins) {
             <td class="cell-wrap" style="font-size:12px;">${classes}</td>
             <td class="num">${escapeHtml(created)}</td>
             <td>
-                ${isSuperAdmin ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="editAdmin('${escapeHtml(rowId)}')" title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>` : ''}
-                ${isSuperAdmin && !isSelf ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="resetAdminPassword('${escapeHtml(rowId)}')" title="重置密码" aria-label="重置密码">${ico('i-key','ico-sm')}</button>` : ''}
-                ${isSuperAdmin && !isDefault && !isSelf ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="deleteAdmin('${escapeHtml(rowId)}')" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>` : ''}
+                ${isSuperAdmin ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="editAdmin(${jsonAttr(rowId)})" title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>` : ''}
+                ${isSuperAdmin && !isSelf ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="resetAdminPassword(${jsonAttr(rowId)})" title="重置密码" aria-label="重置密码">${ico('i-key','ico-sm')}</button>` : ''}
+                ${isSuperAdmin && !isDefault && !isSelf ? `<button class="btn btn-ghost btn-sm btn-icon" onclick="deleteAdmin(${jsonAttr(rowId)})" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>` : ''}
             </td>
         </tr>`;
     }).join('');
@@ -2262,10 +2310,19 @@ function editAdmin(id) {
     document.getElementById('adminModal').classList.add('show');
 }
 
+// 班级复选框加载失败标记：失败时禁止保存，防止空 classes 覆盖原管理员班级（二轮审查）
+let adminClassesLoadFailed = false;
+
 function loadClassesForAdmin(selectedClasses) {
+    adminClassesLoadFailed = false;
     apiFetch(`${API_BASE}/classes`).then(r => r.json()).then(res => {
         const container = document.getElementById('adminClassesContainer');
-        if (!res.success || !res.data || res.data.length === 0) {
+        if (!res.success || !res.data) {
+            adminClassesLoadFailed = true;
+            container.innerHTML = '<div class="empty-hint">班级数据加载失败</div>';
+            return;
+        }
+        if (res.data.length === 0) {
             container.innerHTML = '<div class="empty-hint">暂无班级数据</div>';
             return;
         }
@@ -2274,6 +2331,10 @@ function loadClassesForAdmin(selectedClasses) {
                 <input type="checkbox" class="admin-class-check" value="${escapeHtml(c)}" ${selectedClasses.includes(c) ? 'checked' : ''}> ${escapeHtml(c)}
             </label>`
         ).join('');
+    }).catch(e => {
+        console.error('load admin classes error:', e);
+        adminClassesLoadFailed = true;
+        document.getElementById('adminClassesContainer').innerHTML = '<div class="empty-hint">班级数据加载失败</div>';
     });
 }
 
@@ -2286,6 +2347,7 @@ function closeAdminModal() {
 }
 
 function saveAdmin() {
+    if (adminClassesLoadFailed) return showToast('班级数据加载失败，请重新打开窗口', 'error');
     const editId = document.getElementById('editAdminId').value;
     const name = document.getElementById('adminName').value.trim();
     const phone = document.getElementById('adminPhone').value.trim();
@@ -2298,17 +2360,17 @@ function saveAdmin() {
     if (password) data.password = password;
 
     if (editId) {
-        apiFetch(`${API_BASE}/admins/${editId}`, {
+        apiFetch(`${API_BASE}/admins/${encodeURIComponent(editId)}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
         }).then(r => r.json()).then(res => {
             if (res.success) { showToast(res.message); closeAdminModal(); loadAdmins(); } else showToast(res.message, 'error');
-        });
+        }).catch(e => { console.error('saveAdmin PUT error:', e); showToast('网络异常，请重试', 'error'); });
     } else {
         apiFetch(`${API_BASE}/admins`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
         }).then(r => r.json()).then(res => {
             if (res.success) { showToast(res.message); closeAdminModal(); loadAdmins(); } else showToast(res.message, 'error');
-        });
+        }).catch(e => { console.error('saveAdmin POST error:', e); showToast('网络异常，请重试', 'error'); });
     }
 }
 
@@ -2317,7 +2379,7 @@ function deleteAdmin(id) {
     const name = a ? a.name : '';
     confirmThen({
         msg: `确定要删除管理员"${name}"吗？`,
-        url: `${API_BASE}/admins/${id}`,
+        url: `${API_BASE}/admins/${encodeURIComponent(id)}`,
         reload: loadAdmins
     });
 }
@@ -2433,8 +2495,8 @@ function renderTips(tips) {
             <td style="max-width:400px;white-space:pre-wrap;">${escapeHtml(t.content) || '<span style="color:var(--ink-3)">空</span>'}</td>
             <td class="num">${escapeHtml(time)}</td>
             <td>
-                <button class="btn btn-ghost btn-sm btn-icon" onclick="editTip('${escapeHtml(t._id)}')" title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>
-                <button class="btn btn-ghost btn-sm btn-icon" onclick="deleteTip('${escapeHtml(t._id)}')" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="editTip(${jsonAttr(t._id)})" title="编辑" aria-label="编辑">${ico('i-edit','ico-sm')}</button>
+                <button class="btn btn-ghost btn-sm btn-icon" onclick="deleteTip(${jsonAttr(t._id)})" title="删除" aria-label="删除">${ico('i-trash','ico-sm')}</button>
             </td>
         </tr>`;
     }).join('');
@@ -2462,12 +2524,20 @@ function editTip(id) {
 function loadClassOptions(selected) {
     apiFetch(`${API_BASE}/classes`).then(r => r.json()).then(res => {
         const sel = document.getElementById('tipClassName');
+        sel.disabled = false;
         sel.innerHTML = '<option value="">请选择班级</option>';
         if (res.success && res.data) {
             res.data.forEach(c => {
                 sel.innerHTML += `<option value="${escapeHtml(c)}" ${c === selected ? 'selected' : ''}>${escapeHtml(c)}</option>`;
             });
         }
+    }).catch(e => {
+        console.error('load tip classes error:', e);
+        // 失败时清空并禁用下拉，防止残留旧选项被提交（二轮审查）
+        const sel = document.getElementById('tipClassName');
+        sel.innerHTML = '<option value="">班级加载失败</option>';
+        sel.disabled = true;
+        showToast('班级数据加载失败', 'error');
     });
 }
 
@@ -2483,7 +2553,7 @@ function saveTip() {
         body: JSON.stringify({ className, content })
     }).then(r => r.json()).then(res => {
         if (res.success) { showToast(res.message); closeTipModal(); loadTips(); } else showToast(res.message, 'error');
-    });
+    }).catch(e => { console.error('saveTip error:', e); showToast('网络异常，请重试', 'error'); });
 }
 
 function deleteTip(id) {
@@ -2491,7 +2561,7 @@ function deleteTip(id) {
     const className = t ? t.className : '';
     confirmThen({
         msg: `确定删除「${className}」的温馨提示？`,
-        url: `${API_BASE}/tips/${id}`,
+        url: `${API_BASE}/tips/${encodeURIComponent(id)}`,
         reload: loadTips
     });
 }
@@ -2505,7 +2575,7 @@ const adminImportCtrl = makeImportController({
     fileErr: '请选择 Excel 文件',
     pendingHtml: '正在导入...',
     successHtml: d => {
-        let html = `<div class="result-box result-success"><span class="result-icon">${ico('i-check-circle')}</span><div>导入完成：共 ${d.total} 条，成功 ${d.added} 条，失败 ${d.failed} 条</div></div>`;
+        let html = `<div class="result-box result-success"><span class="result-icon">${ico('i-check-circle')}</span><div>导入完成：共 ${Number(d.total) || 0} 条，成功 ${Number(d.added) || 0} 条，失败 ${Number(d.failed) || 0} 条</div></div>`;
         if (d.errors && d.errors.length > 0) {
             html += '<div class="error-list">' + d.errors.map(e => `<div class="error-item">${ico('i-alert','ico-sm')} ${escapeHtml(e)}</div>`).join('') + '</div>';
         }

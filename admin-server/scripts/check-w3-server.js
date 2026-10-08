@@ -25,7 +25,7 @@ ok('A4 precheck rejectSelf 定义1+调用2+消息逐字',
     src.includes("rejectSelf('不能重置自己的账号，请使用修改密码功能')"));
 ok('A5 precheck 判断顺序不变（getAdmins→find→phone→消息）',
     /const target = \(list && list\.data \|\| \[\]\)\.find\(a => a\._id === req\.params\.id\);\s*\n\s*if \(target && target\.phone === req\.admin\.phone\) \{\s*\n\s*res\.json\(\{ success: false, message \}\);/.test(src));
-ok('A6 actorParams 定义1+调用5', count(/const actorParams = /g) === 1 && count(/actorParams\(req\)/g) === 6,
+ok('A6 actorParams 定义1+调用19（6读+7写路由+1学员导入+3提示+1管理员导入+1同步，二轮L1/L2/H1后）', count(/const actorParams = /g) === 1 && count(/actorParams\(req\)/g) === 19,
     'call=' + count(/actorParams\(req\)/g));
 ok('A7 actorRole 字面仅剩 actorParams 定义1处', count(/actorRole: req\.admin\.role/g) === 1, 'n=' + count(/actorRole: req\.admin\.role/g));
 

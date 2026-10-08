@@ -15,10 +15,10 @@ jobs:
       # 零依赖检查：JS 语法 + HTML/CSS 静态检查（不 npm install，云函数/密钥类依赖不进 CI）
       - name: JS 语法检查
         run: |
-          node --check webadmin/admin-server/server.js
-          node --check webadmin/admin-server/scripts/check-html.js
-          node --check webadmin/admin-server/test/e2e-profile.js
-          node --check webadmin/admin-server/test/e2e-classmatrix.js
+          node --check admin-server/server.js
+          node --check admin-server/scripts/check-html.js
+          node --check admin-server/test/e2e-profile.js
+          node --check admin-server/test/e2e-classmatrix.js
           node --check wxminiprogram/cloudfunctions/adminApi/index.js
       - name: HTML/CSS 静态检查
-        run: node webadmin/admin-server/scripts/check-html.js
+        run: node admin-server/scripts/check-html.js

@@ -5,6 +5,7 @@ Page({
   data: {
     phone: '',
     password: '',
+    submitting: false,
     showPasswordModal: false,
     changeOldPwd: '',
     changeNewPwd: '',
@@ -20,6 +21,7 @@ Page({
   },
 
   onLogin: function () {
+    if (this.data.submitting) return; // 防双击重复提交（两路登录会各发一次云函数）
     const phone = this.data.phone.trim();
     const password = this.data.password.trim();
     if (!phone) {
@@ -31,6 +33,7 @@ Page({
       return;
     }
 
+    this.setData({ submitting: true });
     wx.showLoading({ title: '登录中...' });
 
     // 先尝试管理员登录（密码校验在云函数完成）
@@ -41,13 +44,14 @@ Page({
         const safeAdmin = { _id: admin._id, phone: admin.phone, name: admin.name, role: admin.role || 'admin', classes: admin.classes || [], token: admin.token };
         if (admin.mustChangePassword) {
           // 首次登录强制修改密码；此时不落登录态，杀掉 App 下次登录仍会被拦
-          this.setData({ password: '', showPasswordModal: true, pendingAdmin: admin, pendingStudent: null });
+          this.setData({ password: '', showPasswordModal: true, pendingAdmin: admin, pendingStudent: null, submitting: false });
           wx.showToast({ title: '请先修改初始密码', icon: 'none' });
           return;
         }
         app.globalData.isAdmin = true;
         app.globalData.adminInfo = safeAdmin;
         wx.setStorageSync('adminSession', safeAdmin);
+        this.setData({ submitting: false }); // reLaunch 失败兜底：按钮不卡死（二轮审查）
         wx.reLaunch({ url: '/pages/admin/admin' });
         return;
       }
@@ -62,6 +66,7 @@ Page({
   studentLogin: function (phone, password) {
     if (phone.length !== 11) {
       wx.hideLoading();
+      this.setData({ submitting: false });
       wx.showToast({ title: '请输入正确的手机号码', icon: 'none' });
       return;
     }
@@ -69,6 +74,7 @@ Page({
     callUserApi('loginStudent', { phone: phone, password: password }).then(res => {
       wx.hideLoading();
       if (!res || !res.success) {
+        this.setData({ submitting: false });
         const msg = (res && res.message) || '登录失败';
         if (msg.indexOf('未找到') >= 0 || msg.indexOf('不存在') >= 0) {
           wx.showModal({
@@ -92,6 +98,7 @@ Page({
         const endDate = new Date(courseEndDate.replace(/-/g, '/'));
         endDate.setHours(23, 59, 59, 999);
         if (today > endDate) {
+          this.setData({ submitting: false });
           wx.showModal({
             title: '账号已失效',
             content: '您的课程已于 ' + courseEndDate + ' 结束，账号已无法登录。如需继续学习，请联系管理员。',
@@ -105,15 +112,17 @@ Page({
 
       // 首次登录需要修改密码：不落登录态（改密不可跳过，杀掉 App 下次登录仍会被拦）
       if (student.mustChangePassword) {
-        this.setData({ password: '', showPasswordModal: true, pendingStudent: student, pendingAdmin: null });
+        this.setData({ password: '', showPasswordModal: true, pendingStudent: student, pendingAdmin: null, submitting: false });
         return;
       }
 
       app.globalData.userInfo = safe;
       wx.setStorageSync('userSession', safe);
+      this.setData({ submitting: false });
       this.createOrUpdateUser(phone, student.name);
     }).catch(err => {
       wx.hideLoading();
+      this.setData({ submitting: false });
       if (err && err.message && err.code !== 'UNAUTHORIZED') {
         wx.showToast({ title: err.message, icon: 'none' });
       } else {
@@ -143,6 +152,7 @@ Page({
   },
 
   onSubmitPassword: function () {
+    if (this._pwdSubmitting) return; // 防双击重复提交（二轮审查）
     const { changeOldPwd, changeNewPwd, changeConfirmPwd, pendingStudent, pendingAdmin } = this.data;
     const isAdminChange = !!pendingAdmin;
     if (!changeOldPwd) {
@@ -159,10 +169,12 @@ Page({
       return;
     }
 
+    this._pwdSubmitting = true;
     wx.showLoading({ title: '修改中...' });
 
     const finish = () => {
       wx.hideLoading();
+      this._pwdSubmitting = false;
       if (isAdminChange) {
         // 改密后旧会话已全部吊销，清掉本地登录态要求重新登录
         app.clearAdminSession();
@@ -183,6 +195,7 @@ Page({
 
     const fail = (msg) => {
       wx.hideLoading();
+      this._pwdSubmitting = false;
       wx.showToast({ title: msg || '修改失败', icon: 'none' });
     };
 
@@ -245,6 +258,10 @@ Page({
       wx.switchTab({ url: '/pages/index/index' });
     }).catch(err => {
       console.error(err);
+      if (err && err.code === 'UNAUTHORIZED') {
+        // 会话已失效：callUserApi 已清会话并回登录页，这里不能再 switchTab 抢跳（二轮审查）
+        return;
+      }
       // 用户表同步失败不阻断登录
       const token = wx.getStorageSync('userSession').token;
       app.globalData.userInfo = Object.assign({}, app.globalData.userInfo, { phone: phone, name: name, token: token });

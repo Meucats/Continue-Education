@@ -3,14 +3,25 @@ const { callAdminApi } = require('../../utils/api.js');
 
 Page({
   data: {
-    accounts: [],
     filteredAccounts: [],
     searchKey: ''
   },
+  accounts: [], // 全量源放实例字段，避免与列表双份 setData 序列化
 
   onShow: function () {
     if (!util.ensureAdmin()) return;
     this.loadAccounts();
+  },
+
+  applySearch: function (list) {
+    const key = this.data.searchKey.trim().toLowerCase();
+    if (!key) return list;
+    // 字段统一转字符串再匹配：脏数据缺字段时过滤不能抛 TypeError 中断渲染（二轮审查）
+    return list.filter(item => {
+      const name = String(item.name || '').toLowerCase();
+      const phone = String(item.phone || '');
+      return name.includes(key) || phone.includes(key);
+    });
   },
 
   loadAccounts: function () {
@@ -21,13 +32,15 @@ Page({
         ...item,
         createdAtText: util.formatDate(item.createdAt)
       }));
-      this.setData({
-        accounts: accounts,
-        filteredAccounts: accounts
-      });
+      this.accounts = accounts;
+      // 返回后重载也按当前搜索词过滤
+      this.setData({ filteredAccounts: this.applySearch(accounts) });
+      if (res.truncated) {
+        wx.showToast({ title: '数据已截断：仅显示前 ' + accounts.length + ' 条' + (res.total ? '（共 ' + res.total + ' 条）' : ''), icon: 'none', duration: 2500 });
+      }
     }).catch(err => {
       wx.hideLoading();
-      wx.showToast({ title: '加载失败', icon: 'none' });
+      if (!err || err.code !== 'UNAUTHORIZED') wx.showToast({ title: '加载失败', icon: 'none' });
       console.error(err);
     });
   },
@@ -35,25 +48,17 @@ Page({
   onSearchInput: function (e) {
     this.setData({ searchKey: e.detail.value });
     if (!e.detail.value) {
-      this.setData({ filteredAccounts: this.data.accounts });
+      this.setData({ filteredAccounts: this.accounts });
     }
   },
 
   onSearch: function () {
-    const key = this.data.searchKey.trim().toLowerCase();
-    if (!key) {
-      this.setData({ filteredAccounts: this.data.accounts });
-      return;
-    }
-    const filtered = this.data.accounts.filter(item =>
-      item.name.toLowerCase().includes(key) ||
-      item.phone.includes(key)
-    );
-    this.setData({ filteredAccounts: filtered });
+    this.setData({ filteredAccounts: this.applySearch(this.accounts) });
   },
 
   onExport: function () {
-    const { accounts } = this.data;
+    // 导出与界面同口径：导出当前筛选结果，避免「界面 3 条、导出全量」的不一致（二轮审查）
+    const accounts = this.applySearch(this.accounts);
     if (accounts.length === 0) {
       wx.showToast({ title: '没有可导出的数据', icon: 'none' });
       return;

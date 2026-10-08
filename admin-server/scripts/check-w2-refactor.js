@@ -40,7 +40,7 @@ while ((m = attrRe.exec(html))) {
     while ((f = fnRe.exec(m[1]))) refNames.add(f[1]);
 }
 const kw = new Set(['if', 'for', 'while', 'switch', 'return', 'new', 'typeof', 'function', 'confirm', 'prompt',
-    'querySelectorAll', 'setTimeout', 'preventDefault']);
+    'querySelectorAll', 'querySelector', 'setTimeout', 'preventDefault']);
 const missing = [...refNames].filter(n => !kw.has(n) && !new RegExp('function\\s+' + n.replace(/\$/g, '\\$') + '\\s*\\(').test(html));
 ok('C1 HTML 内联引用全部有 function 定义', missing.length === 0, 'refs=' + refNames.size + (missing.length ? ' missing=' + missing.join(',') : ''));
 

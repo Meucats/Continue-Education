@@ -25,9 +25,13 @@ Page({
         this.setData({ requests: requests });
         this.filterRequests();
         this.updatePendingCount();
+        // 云端按 200 条截断时明确提示，避免把残缺列表当全量
+        if (res.truncated) {
+          wx.showToast({ title: '数据已截断：共 ' + res.total + ' 条，仅显示 ' + requests.length + ' 条', icon: 'none', duration: 2500 });
+        }
       }).catch(err => {
         wx.hideLoading();
-        wx.showToast({ title: '加载失败', icon: 'none' });
+        if (!err || err.code !== 'UNAUTHORIZED') wx.showToast({ title: '加载失败', icon: 'none' });
         console.error(err);
       });
   },
@@ -93,13 +97,18 @@ Page({
     const action = status === 'approved' ? 'approveRequest' : 'rejectRequest';
     const extra = { id: id };
     if (extraData && extraData.rejectReason) extra.reason = extraData.rejectReason;
-    callAdminApi(action, null, extra).then(() => {
+    callAdminApi(action, null, extra).then(res => {
       wx.hideLoading();
-      wx.showToast({ title: '操作成功', icon: 'success' });
-      this.loadRequests();
+      if (res && res.success) {
+        wx.showToast({ title: res.message || '操作成功', icon: 'success' });
+        // 延迟重载：loadRequests 的 showLoading 会顶掉刚弹的成功 toast（二轮审查）
+        setTimeout(() => this.loadRequests(), 1500);
+      } else {
+        wx.showToast({ title: (res && res.message) || '操作失败', icon: 'none' });
+      }
     }).catch(err => {
       wx.hideLoading();
-      wx.showToast({ title: '操作失败', icon: 'none' });
+      if (!err || err.code !== 'UNAUTHORIZED') wx.showToast({ title: '操作失败', icon: 'none' });
       console.error(err);
     });
   }

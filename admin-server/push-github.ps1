@@ -6,10 +6,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# 本脚本位于 admin-server/，其父目录即仓库根
 $root = Split-Path -Parent $PSScriptRoot
-if ((Split-Path -Leaf $PSScriptRoot) -ne "webadmin") {
-  $root = "G:\杭职大继教院进校系统1"
-}
 Set-Location -LiteralPath $root
 
 Write-Host "=== 敏感文件应被忽略（不应出现在 git status）===" -ForegroundColor Cyan
@@ -25,7 +23,7 @@ if (-not (Test-Path ".git")) {
 }
 
 git add .
-git commit -m "初始化：进校系统 Web后台 + 小程序"
+git commit -m "初始化：杭职大继续教育培训服务管理系统 Web后台 + 小程序"
 git remote remove origin 2>$null
 git remote add origin $RepoUrl
 git push -u origin main --force

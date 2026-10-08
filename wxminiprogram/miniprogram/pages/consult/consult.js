@@ -45,7 +45,7 @@ Page({
         historyRequests: list.slice(0, 20)
       });
       return list;
-    }).catch(() => {});
+    }).catch(err => { console.error('refreshList error:', err); });
   },
 
   onSubmit: function () {

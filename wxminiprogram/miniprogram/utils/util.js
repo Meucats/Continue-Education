@@ -53,11 +53,25 @@ const setWarmNavColor = isWarm => {
   });
 };
 
+// 申请是否处于有效时段内（暖色唯一判据）：approved 且当前时间落在 进校日期 开始~结束 时间窗
+// 与云端 isRequestExpired 对齐：缺进校日期=false，结束缺省 23:59，开始缺省 00:00；含边界秒
+const isWithinEntryWindow = req => {
+  if (!req || req.status !== 'approved' || !req.entryDate) return false;
+  const startStr = (req.entryDate + ' ' + (req.entryStartTime || '00:00')).replace(/-/g, '/');
+  const endStr = (req.entryDate + ' ' + (req.entryEndTime || '23:59')).replace(/-/g, '/');
+  const t0 = new Date(startStr).getTime();
+  const t1 = new Date(endStr).getTime();
+  if (isNaN(t0) || isNaN(t1)) return false;
+  const now = Date.now();
+  return now >= t0 && now <= t1;
+};
+
 module.exports = {
   formatDate,
   formatDateTime,
   isCourseExpired,
   hasActiveCourse,
   ensureAdmin,
-  setWarmNavColor
+  setWarmNavColor,
+  isWithinEntryWindow
 };

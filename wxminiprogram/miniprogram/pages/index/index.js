@@ -19,13 +19,15 @@ Page({
     const userInfo = app.globalData.userInfo;
     const isLoggedIn = !!userInfo;
     this.setData({ isLoggedIn: isLoggedIn, userInfo: userInfo });
-    this.loadTip(userInfo);
     if (isLoggedIn) {
-      this.loadCourses(userInfo.phone);
+      // loadCourses 返回班级 promise，loadTip 复用，避免同屏重复 getStudentSelf
+      const selfP = this.loadCourses(userInfo.phone);
       this.loadRequestInfo(userInfo.phone);
+      this.loadTip(userInfo, selfP);
     } else {
       this.setData({ courses: [], hasCourse: false, requestInfo: null, isRequestExpired: false, isWarm: false });
       util.setWarmNavColor(false);
+      this.loadTip(userInfo);
     }
   },
 
@@ -45,11 +47,13 @@ Page({
     const mondayStr = util.formatDate(monday);
     const sundayStr = util.formatDate(sunday);
 
-    callUserApi('getStudentSelf').then(res => {
+    return callUserApi('getStudentSelf').then(res => {
       const list = res && res.success && res.data ? [res.data] : [];
       const courseCards = [];
+      let className = '';
       const todayStr = util.formatDate(new Date());
       list.forEach(item => {
+        if (!className) className = item.className || '';
         const expired = util.isCourseExpired(item.deadline, item.courseEndDate);
         if (item.courseDates && item.courseDates.length > 0) {
           item.courseDates.forEach(cd => {
@@ -82,38 +86,41 @@ Page({
       courseCards.sort((a, b) => a.date.localeCompare(b.date));
       const hasCourse = courseCards.length > 0;
       this.setData({ courses: courseCards, hasCourse: hasCourse });
+      return className;
     }).catch(err => {
       console.error('加载课程失败', err);
+      if (!err || err.code !== 'UNAUTHORIZED') wx.showToast({ title: '课程加载失败，请重试', icon: 'none' });
+      return '';
     });
   },
 
   loadRequestInfo: function (phone) {
-    callUserApi('getMyRequests', { limit: 1 }).then(res => {
+    callUserApi('getMyRequests', { limit: 20 }).then(res => {
       const list = (res && res.success && res.data) ? res.data : [];
-      let isWarm = false;
-      if (list.length > 0) {
-        const req = list[0];
-        // 已通过且已过 进校日期+结束时间（无进校日期的旧申请视为过期）
-        const isExpired = !!req.isExpired;
-        isWarm = req.status === 'approved' && !isExpired;
-        this.setData({ requestInfo: req, isRequestExpired: isExpired, isWarm: isWarm });
+      const newest = list[0] || null;
+      // 展示最新一条申请；暖色只看「是否有申请正处于有效时段内」
+      const warmReq = list.some(r => util.isWithinEntryWindow(r));
+      if (newest) {
+        this.setData({ requestInfo: newest, isRequestExpired: !!newest.isExpired, isWarm: warmReq });
       } else {
         this.setData({ requestInfo: null, isRequestExpired: false, isWarm: false });
       }
-      util.setWarmNavColor(isWarm);
+      util.setWarmNavColor(warmReq);
     }).catch(err => {
       console.error('加载申请信息失败', err);
+      if (!err || err.code !== 'UNAUTHORIZED') wx.showToast({ title: '申请信息加载失败，请重试', icon: 'none' });
     });
   },
 
-  loadTip: function (userInfo) {
+  loadTip: function (userInfo, selfPromise) {
     const defaultTip = '欢迎来到杭州职业技术大学继续教育学院！请遵守校园管理规定，按时到校上课。如有疑问请联系：56700015。';
     if (!userInfo || !userInfo.phone) {
       this.setData({ tipContent: defaultTip, hasTip: true });
       return;
     }
-    callUserApi('getStudentSelf').then(res => {
-      const className = res && res.success && res.data && res.data.className;
+    // 优先复用 loadCourses 已发起的 getStudentSelf，避免同屏二次调用
+    const classNameP = selfPromise || callUserApi('getStudentSelf').then(res => (res && res.success && res.data && res.data.className) || '');
+    classNameP.then(className => {
       if (!className) {
         this.setData({ tipContent: defaultTip, hasTip: true });
         return;
